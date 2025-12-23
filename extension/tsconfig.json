@@ -1,0 +1,27 @@
+{
+  "extends": "@tsconfig/svelte/tsconfig.json",
+  "compilerOptions": {
+    "moduleResolution": "bundler",
+    "target": "esnext",
+    "module": "esnext",
+    "baseUrl": ".",
+    "paths": {
+      "~*": [
+        "./src/*"
+      ]
+    },
+    "types": [
+      "chrome",
+      "node"
+    ]
+  },
+  "include": [
+    ".plasmo/index.d.ts",
+    "src/**/*",
+    "content.ts",
+    ".placmo/**/*"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
+}

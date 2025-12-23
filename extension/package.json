@@ -1,0 +1,37 @@
+{
+    "name": "betclic-extension",
+    "displayName": "Betclic Smart Predictor",
+    "version": "0.0.1",
+    "description": "AI-powered betting predictions extension",
+    "author": "Antigravity",
+    "scripts": {
+        "dev": "plasmo dev",
+        "build": "plasmo build",
+        "package": "plasmo package"
+    },
+    "dependencies": {
+        "@plasmohq/storage": "^1.10.0",
+        "autoprefixer": "^10.4.17",
+        "plasmo": "0.89.0",
+        "postcss": "^8.4.35",
+        "sharp": "^0.34.5",
+        "svelte": "^4.2.12",
+        "tailwindcss": "^3.4.1"
+    },
+    "devDependencies": {
+        "@sveltejs/vite-plugin-svelte": "^3.0.2",
+        "@tsconfig/svelte": "^5.0.2",
+        "@types/chrome": "0.0.263",
+        "@types/node": "20.11.24",
+        "prettier": "3.2.5",
+        "typescript": "5.3.3"
+    },
+    "manifest": {
+        "host_permissions": [
+            "https://*.betclic.pl/*"
+        ],
+        "permissions": [
+            "storage"
+        ]
+    }
+}
