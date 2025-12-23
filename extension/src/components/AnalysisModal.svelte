@@ -1,6 +1,5 @@
 <script>
     import { fade, scale } from "svelte/transition";
-    export let winnerName;
     export let analysis;
     export let stats = null;
     export let onClose;
@@ -8,13 +7,64 @@
     function handleKeydown(e) {
         if (e.key === "Escape") onClose();
     }
+
+    // Radar chart configuration
+    const radarLabels = ["Atak", "Obrona", "Forma", "H2H", "Posiadanie"];
+    const radarAngles = radarLabels.map(
+        (_, i) => (Math.PI * 2 * i) / radarLabels.length - Math.PI / 2,
+    );
+
+    // Get radar data from stats or use defaults
+    $: radarData = stats?.radar || {
+        home: { attack: 85, defense: 70, form: 80, h2h: 75, possession: 82 },
+        away: { attack: 45, defense: 65, form: 50, h2h: 40, possession: 38 },
+    };
+
+    $: homeTeamName = stats?.homeTeam || "Home";
+    $: awayTeamName = stats?.awayTeam || "Away";
+
+    // Convert data to array format for polygon
+    $: homeValues = [
+        radarData.home.attack,
+        radarData.home.defense,
+        radarData.home.form,
+        radarData.home.h2h,
+        radarData.home.possession,
+    ];
+    $: awayValues = [
+        radarData.away.attack,
+        radarData.away.defense,
+        radarData.away.form,
+        radarData.away.h2h,
+        radarData.away.possession,
+    ];
+
+    // SVG center and radius
+    const cx = 100;
+    const cy = 100;
+    const maxRadius = 70;
+
+    // Calculate polygon points
+    function getPolygonPoints(values) {
+        return values
+            .map((val, i) => {
+                const r = (val / 100) * maxRadius;
+                const x = cx + r * Math.cos(radarAngles[i]);
+                const y = cy + r * Math.sin(radarAngles[i]);
+                return `${x},${y}`;
+            })
+            .join(" ");
+    }
+
+    // Grid circles radii (20%, 40%, 60%, 80%, 100%)
+    const gridLevels = [0.2, 0.4, 0.6, 0.8, 1.0];
 </script>
 
 <svelte:window on:keydown={handleKeydown} />
 
 <!-- Backdrop -->
 <div
-    class="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100000] flex items-center justify-center p-4"
+    class="fixed inset-0 bg-black/70 backdrop-blur-sm z-[100000] flex items-center justify-center p-4"
     transition:fade
     on:click|self={onClose}
     on:keydown={(e) => {
@@ -25,72 +75,195 @@
 >
     <!-- Modal Content -->
     <div
-        class="bg-[#1a1d2e] border border-slate-700/50 rounded-xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col relative h-[500px] max-h-[90vh] font-sans"
+        class="bg-[#151519] border border-[#2a2a2f] rounded-lg shadow-2xl w-[520px] overflow-hidden flex flex-col relative max-h-[90vh] font-sans"
         transition:scale={{ start: 0.98, duration: 200 }}
     >
         <!-- Header (Compact) -->
         <div
-            class="px-5 py-3 border-b border-slate-800/50 flex justify-between items-center bg-[#1a1d2e] shrink-0"
+            class="px-5 py-3 border-b border-[#2a2a2f] flex justify-between items-center bg-[#151519] shrink-0"
         >
             <div class="flex items-center gap-2">
                 <div
-                    class="w-2 h-2 rounded-full bg-green-500 animate-pulse"
+                    class="w-2 h-2 rounded-full bg-[#4ade80] animate-pulse"
                 ></div>
-                <h2
-                    class="text-sm font-bold text-white tracking-wide uppercase"
-                >
+                <h2 class="text-base font-semibold text-white tracking-wide">
                     AI Match Intelligence
                 </h2>
             </div>
             <button
                 on:click={onClose}
-                class="text-slate-400 hover:text-white transition-colors bg-transparent border-0 p-1 cursor-pointer leading-none"
+                class="text-[#6b6b75] hover:text-white transition-colors bg-transparent border-0 p-1 cursor-pointer leading-none text-lg"
                 >&times;</button
             >
         </div>
 
         <!-- Body -->
-        <div class="flex-1 flex flex-col overflow-hidden">
+        <div class="flex-1 flex flex-col">
             {#if stats && stats.probs}
-                <div
-                    class="p-5 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-700 flex-1"
-                >
+                <div class="p-6">
                     <!-- 1. Probabilities (Compact Bar) -->
                     <div class="mb-5">
                         <div
-                            class="flex justify-between text-[10px] text-slate-400 font-bold mb-1 uppercase tracking-wider"
+                            class="flex justify-between text-sm text-[#8a8a95] font-medium mb-2 uppercase tracking-wider"
                         >
                             <span>Home</span>
                             <span>Draw</span>
                             <span>Away</span>
                         </div>
                         <div
-                            class="flex h-2 rounded-full overflow-hidden bg-slate-800"
+                            class="flex h-3 rounded overflow-hidden bg-[#1e1e24]"
                         >
                             <div
-                                class="bg-green-500 h-full"
+                                class="bg-[#3d8c4a] h-full"
                                 style="width: {stats.probs.home}%"
                             ></div>
                             <div
-                                class="bg-slate-500 h-full"
+                                class="bg-[#5a5a65] h-full"
                                 style="width: {stats.probs.draw}%"
                             ></div>
                             <div
-                                class="bg-blue-500 h-full"
+                                class="bg-[#6b6b75] h-full"
                                 style="width: {stats.probs.away}%"
                             ></div>
                         </div>
                     </div>
 
-                    <!-- 2. Analysis Text -->
+                    <!-- 2. Radar Chart (Spider Web) -->
+                    <div class="mb-5">
+                        <h3
+                            class="text-sm text-[#8a8a95] mb-3 font-medium uppercase tracking-wide"
+                        >
+                            Porównanie Drużyn
+                        </h3>
+                        <div class="flex items-center justify-center">
+                            <svg viewBox="0 0 200 200" class="w-52 h-52">
+                                <!-- Grid circles (pentagon shapes) -->
+                                {#each gridLevels as level}
+                                    <polygon
+                                        points={radarAngles
+                                            .map((angle, i) => {
+                                                const r = level * maxRadius;
+                                                const x =
+                                                    cx + r * Math.cos(angle);
+                                                const y =
+                                                    cy + r * Math.sin(angle);
+                                                return `${x},${y}`;
+                                            })
+                                            .join(" ")}
+                                        fill="none"
+                                        stroke="#2a2a2f"
+                                        stroke-width="1"
+                                    />
+                                {/each}
+
+                                <!-- Axis lines -->
+                                {#each radarAngles as angle}
+                                    <line
+                                        x1={cx}
+                                        y1={cy}
+                                        x2={cx + maxRadius * Math.cos(angle)}
+                                        y2={cy + maxRadius * Math.sin(angle)}
+                                        stroke="#2a2a2f"
+                                        stroke-width="1"
+                                    />
+                                {/each}
+
+                                <!-- Away team polygon (draw first, so Home is on top) -->
+                                <polygon
+                                    points={getPolygonPoints(awayValues)}
+                                    fill="rgba(239, 68, 68, 0.2)"
+                                    stroke="#ef4444"
+                                    stroke-width="2"
+                                />
+
+                                <!-- Home team polygon -->
+                                <polygon
+                                    points={getPolygonPoints(homeValues)}
+                                    fill="rgba(74, 222, 128, 0.25)"
+                                    stroke="#4ade80"
+                                    stroke-width="2"
+                                />
+
+                                <!-- Data points - Away -->
+                                {#each awayValues as val, i}
+                                    <circle
+                                        cx={cx +
+                                            (val / 100) *
+                                                maxRadius *
+                                                Math.cos(radarAngles[i])}
+                                        cy={cy +
+                                            (val / 100) *
+                                                maxRadius *
+                                                Math.sin(radarAngles[i])}
+                                        r="3"
+                                        fill="#ef4444"
+                                    />
+                                {/each}
+
+                                <!-- Data points - Home -->
+                                {#each homeValues as val, i}
+                                    <circle
+                                        cx={cx +
+                                            (val / 100) *
+                                                maxRadius *
+                                                Math.cos(radarAngles[i])}
+                                        cy={cy +
+                                            (val / 100) *
+                                                maxRadius *
+                                                Math.sin(radarAngles[i])}
+                                        r="3"
+                                        fill="#4ade80"
+                                    />
+                                {/each}
+
+                                <!-- Labels -->
+                                {#each radarLabels as label, i}
+                                    <text
+                                        x={cx +
+                                            (maxRadius + 18) *
+                                                Math.cos(radarAngles[i])}
+                                        y={cy +
+                                            (maxRadius + 18) *
+                                                Math.sin(radarAngles[i])}
+                                        text-anchor="middle"
+                                        dominant-baseline="middle"
+                                        class="fill-[#8a8a95] text-[8px] font-medium"
+                                    >
+                                        {label}
+                                    </text>
+                                {/each}
+                            </svg>
+                        </div>
+                        <!-- Legend -->
+                        <div class="flex justify-center gap-8 mt-3">
+                            <div class="flex items-center gap-2">
+                                <div
+                                    class="w-3 h-3 rounded-full bg-[#4ade80]"
+                                ></div>
+                                <span class="text-sm text-[#a0a0a8]"
+                                    >{homeTeamName}</span
+                                >
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <div
+                                    class="w-3 h-3 rounded-full bg-[#ef4444]"
+                                ></div>
+                                <span class="text-sm text-[#a0a0a8]"
+                                    >{awayTeamName}</span
+                                >
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 3. Analysis Text -->
                     <div>
                         <h3
-                            class="text-[10px] text-slate-400 mb-2 font-bold uppercase tracking-wide"
+                            class="text-sm text-[#8a8a95] mb-3 font-medium uppercase tracking-wide"
                         >
                             Analiza Ekspercka
                         </h3>
                         <div
-                            class="text-slate-200 text-sm leading-relaxed text-justify analysis-content"
+                            class="text-[#c5c5cc] text-base leading-relaxed analysis-content"
                         >
                             {@html analysis}
                         </div>
@@ -99,7 +272,7 @@
             {:else}
                 <!-- Loading State placeholder if stats missing but modal open -->
                 <div
-                    class="flex-1 flex items-center justify-center text-slate-500"
+                    class="flex-1 flex items-center justify-center text-[#6b6b75]"
                 >
                     <span class="animate-pulse"
                         >Analizowanie danych meczowych...</span
@@ -110,31 +283,19 @@
 
         <!-- Footer -->
         <div
-            class="p-3 bg-slate-900 border-t border-slate-800 flex justify-between items-center shrink-0"
+            class="p-4 bg-[#101014] border-t border-[#2a2a2f] flex justify-between items-center shrink-0"
         >
             <div class="flex flex-col">
-                <span class="text-[9px] text-slate-500">Pewność Typu</span>
-                <div class="text-green-400 font-bold text-xs">Wysoka (78%)</div>
+                <span class="text-sm text-[#6b6b75]">Pewność Typu</span>
+                <div class="text-[#4ade80] font-bold text-base">
+                    Wysoka (78%)
+                </div>
             </div>
             <button
                 on:click={onClose}
-                class="px-6 py-1.5 bg-slate-800 hover:bg-slate-700 text-white text-xs rounded-md border border-slate-700 transition-colors uppercase font-bold tracking-wide cursor-pointer"
+                class="px-6 py-2 bg-[#2a2a2f] hover:bg-[#3a3a45] text-white text-base rounded border-0 transition-colors font-medium cursor-pointer"
                 >Zamknij</button
             >
         </div>
     </div>
 </div>
-
-<style>
-    /* Custom scrollbar for webkit */
-    .scrollbar-thin::-webkit-scrollbar {
-        width: 4px;
-    }
-    .scrollbar-thin::-webkit-scrollbar-track {
-        background: transparent;
-    }
-    .scrollbar-thin::-webkit-scrollbar-thumb {
-        background: #334155;
-        border-radius: 2px;
-    }
-</style>

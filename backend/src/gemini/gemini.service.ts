@@ -51,20 +51,28 @@ export class GeminiService {
           Instructions:
           1. Act as a sports betting expert.
           2. Estimate win probabilities based on the odds provided and general team knowledge.
-          3. Provide a clear, textual analysis.
-          4. Do NOT hallucinate specific match stats like xG or exact recent results if you don't know them. Focus on team strengths/weaknesses.
+          3. IMPORTANT: Keep the analysis SHORT - maximum 2-3 sentences. Be concise!
+          4. Do NOT hallucinate specific match stats. Focus on key team strengths/weaknesses.
+          5. Generate radar chart data (0-100 scale) for both teams comparing: Attack, Defense, Form, H2H record, Ball Possession.
 
           Return strictly JSON: 
           {
             "prediction": "1", 
             "summary": "One sentence summary in Polish.",
-            "full_analysis": "Detailed analysis in Polish. Use <b>bold</b> tags for key insights.",
+            "full_analysis": "SHORT analysis in Polish (2-3 sentences MAX). Use <b>bold</b> for the key insight only.",
             "stats": {
-                "probs": { "home": 60, "draw": 25, "away": 15 }
+                "probs": { "home": 60, "draw": 25, "away": 15 },
+                "homeTeam": "${teamA}",
+                "awayTeam": "${teamB}",
+                "radar": {
+                    "home": { "attack": 75, "defense": 70, "form": 65, "h2h": 60, "possession": 68 },
+                    "away": { "attack": 55, "defense": 60, "form": 50, "h2h": 40, "possession": 45 }
+                }
             }
           }
           ("1"=Home, "2"=Away, "X"=Draw).
-          Ensure percentages sum to 100.
+          Ensure percentages in probs sum to 100.
+          Radar values should be 0-100 and reflect team strengths realistically.
         `;
 
         try {
@@ -82,7 +90,15 @@ export class GeminiService {
                 prediction: 'X',
                 summary: 'Błąd AI.',
                 full_analysis: 'Problem z generowaniem analizy.',
-                stats: { probs: { home: 33, draw: 33, away: 33 } }
+                stats: {
+                    probs: { home: 33, draw: 34, away: 33 },
+                    homeTeam: teamA,
+                    awayTeam: teamB,
+                    radar: {
+                        home: { attack: 50, defense: 50, form: 50, h2h: 50, possession: 50 },
+                        away: { attack: 50, defense: 50, form: 50, h2h: 50, possession: 50 }
+                    }
+                }
             };
         }
     }
