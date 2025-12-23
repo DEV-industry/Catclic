@@ -21,6 +21,51 @@ console.log("Betclic Smart Predictor: Content Script Active")
 const style = getStyle();
 document.head.appendChild(style);
 
+// Replace Betclic logo with custom logo
+function replaceLogoWithCustom() {
+    // Inject CSS to hide the Betclic text/icon (::before pseudo element)
+    if (!document.getElementById('custom-logo-styles')) {
+        const hideStyles = document.createElement('style');
+        hideStyles.id = 'custom-logo-styles';
+        hideStyles.textContent = `
+            a[data-qa="commonLogo"] .icons.icon_logoBetclicFill::before,
+            a[data-qa="commonLogo"] .icon_logoBetclicFill::before,
+            a[data-qa="commonLogo"]::before {
+                display: none !important;
+                content: none !important;
+            }
+            a[data-qa="commonLogo"] .icons.icon_logoBetclicFill,
+            a[data-qa="commonLogo"] .icon_logoBetclicFill {
+                display: none !important;
+            }
+        `;
+        document.head.appendChild(hideStyles);
+    }
+
+    const logoLink = document.querySelector('a[data-qa="commonLogo"]') as HTMLAnchorElement;
+    if (logoLink && !logoLink.dataset.customLogoApplied) {
+        // Mark as processed
+        logoLink.dataset.customLogoApplied = "true";
+
+        // Hide ALL child elements
+        Array.from(logoLink.children).forEach((child) => {
+            (child as HTMLElement).style.display = "none";
+        });
+
+        // Create custom logo image
+        const customLogo = document.createElement("img");
+        customLogo.src = chrome.runtime.getURL("assets/logo.png");
+        customLogo.alt = "Logo";
+        customLogo.style.height = "28px";
+        customLogo.style.width = "auto";
+        customLogo.style.objectFit = "contain";
+        customLogo.style.display = "block";
+
+        logoLink.appendChild(customLogo);
+        console.log("Betclic logo replaced with custom logo");
+    }
+}
+
 // --- DEBUGGING ---
 // (Disabled for production feel)
 // setInterval(() => { ... }, 5000);
@@ -75,10 +120,12 @@ function scanAndInject() {
 
 // Observe DOM changes to handle infinite scroll / navigation
 const observer = new MutationObserver((mutations) => {
+    replaceLogoWithCustom();
     scanAndInject();
 });
 
 window.addEventListener("load", () => {
+    replaceLogoWithCustom();
     scanAndInject();
     observer.observe(document.body, { childList: true, subtree: true });
 });

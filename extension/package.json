@@ -32,6 +32,16 @@
         ],
         "permissions": [
             "storage"
+        ],
+        "web_accessible_resources": [
+            {
+                "resources": [
+                    "assets/*"
+                ],
+                "matches": [
+                    "https://*.betclic.pl/*"
+                ]
+            }
         ]
     }
 }
