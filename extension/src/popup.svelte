@@ -108,9 +108,10 @@
                     >
                         <label
                             class="text-[10px] text-[#6b7280] font-bold uppercase tracking-wider block mb-2"
-                            >Data</label
+                            for="dateFilter">Data</label
                         >
                         <select
+                            id="dateFilter"
                             bind:value={dateFilter}
                             class="w-full text-sm bg-transparent border-none outline-none font-medium text-[#0d1620] cursor-pointer"
                         >
@@ -124,9 +125,10 @@
                     >
                         <label
                             class="text-[10px] text-[#6b7280] font-bold uppercase tracking-wider block mb-2"
-                            >Sport</label
+                            for="sportFilter">Sport</label
                         >
                         <select
+                            id="sportFilter"
                             bind:value={sportFilter}
                             class="w-full text-sm bg-transparent border-none outline-none font-medium text-[#0d1620] cursor-pointer"
                         >

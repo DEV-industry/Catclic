@@ -106,7 +106,7 @@
         >
             <div class="flex items-center gap-2">
                 <img
-                    src={chrome.runtime.getURL("assets/logo.png")}
+                    src={window.chrome.runtime.getURL("assets/logo.png")}
                     alt="Betclic AI"
                     class="h-9 w-auto object-contain"
                 />
