@@ -97,12 +97,59 @@ function navigateToNextLeague(visited: string[], sportFilter: string) {
     }
 }
 
+// --- HELPER: SPORT VALIDATION ---
+function getSportKeywords(sport: string): string[] {
+    switch (sport) {
+        case "football": return ["pilka-nozna", "football"];
+        case "tennis": return ["tenis", "tennis"];
+        case "basketball": return ["koszykowka", "basketball"];
+        default: return []; // 'all' or unknown
+    }
+}
+
+function isCurrentPageValidForSport(sport: string): boolean {
+    if (sport === "all") return true;
+
+    const href = window.location.href.toLowerCase();
+    const keywords = getSportKeywords(sport);
+
+    // Check if any keyword exists in the URL
+    return keywords.some(kw => href.includes(kw));
+}
+
+function navigateToSportCategory(sport: string) {
+    let url = "";
+    switch (sport) {
+        case "football": url = "https://www.betclic.pl/pilka-nozna-s1"; break;
+        case "tennis": url = "https://www.betclic.pl/tenis-s2"; break;
+        case "basketball": url = "https://www.betclic.pl/koszykowka-s4"; break;
+    }
+
+    if (url) {
+        console.log(`Navigating to main sport category: ${sport} -> ${url}`);
+        showToast(`Przechodzę do kategorii: ${sport}...`);
+        window.location.href = url;
+    }
+}
+
 // --- CORE LOGIC ---
 export async function processAutoCoupon() {
     const session = await getSession();
     if (!session.active) return;
 
     console.log("Processing Auto Coupon Session:", session);
+
+    // 0. STRICT SPORT CHECK
+    // If we somehow drifted to a wrong page (e.g. user clicked something), stop or redirect.
+    // However, mainly we want to avoid validating on "Popular" or "Live" if strict filtering is on.
+    const sportFilter = session.filters?.sport || "all";
+    if (!isCurrentPageValidForSport(sportFilter)) {
+        console.log(`Current page invalid for sport '${sportFilter}'. Navigating...`);
+        // Add current URL to visited to avoid easy loops, though direct navigation overrides this
+        session.visitedUrls.push(window.location.href);
+        navigateToSportCategory(sportFilter);
+        return; // Stop execution on this page
+    }
 
     // 1. Find matches on current page
     const containers = MatchParser.findPossibleMatchContainers();
@@ -157,7 +204,6 @@ export async function processAutoCoupon() {
         await setSession(session);
 
         // Navigate
-        const sportFilter = session.filters?.sport || "all";
         setTimeout(() => navigateToNextLeague(session.visitedUrls, sportFilter), 1500);
     }
 }
@@ -177,6 +223,13 @@ export async function handleAutoCoupon(maxMatches: number, filters: { date: stri
     };
     await setSession(session);
 
-    // 3. Process current page immediately
+    // 3. CHECK SPORT LOCATION IMMEDIATELY
+    if (!isCurrentPageValidForSport(filters.sport)) {
+        console.log(`Starting AutoCoupon but wrong sport page. Redirecting to ${filters.sport}...`);
+        navigateToSportCategory(filters.sport);
+        return; // Will resume after page load via window.load in betclic.ts
+    }
+
+    // 4. Process current page immediately if valid
     processAutoCoupon();
 }
