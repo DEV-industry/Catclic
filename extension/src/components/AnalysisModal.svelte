@@ -57,7 +57,29 @@
     }
 
     // Grid circles radii (20%, 40%, 60%, 80%, 100%)
+    // Grid circles radii (20%, 40%, 60%, 80%, 100%)
     const gridLevels = [0.2, 0.4, 0.6, 0.8, 1.0];
+
+    // Calculate confidence based on probabilities
+    $: maxProb = stats?.probs
+        ? Math.max(stats.probs.home, stats.probs.draw, stats.probs.away)
+        : 0;
+
+    $: confidenceLabel =
+        maxProb >= 70
+            ? "Bardzo Wysoka"
+            : maxProb >= 55
+              ? "Wysoka"
+              : maxProb >= 45
+                ? "Średnia"
+                : "Niska";
+
+    $: confidenceColor =
+        maxProb >= 55
+            ? "text-[#15803d]" // Green
+            : maxProb >= 45
+              ? "text-[#ca8a04]" // Yellow/Orange
+              : "text-[#dc2626]"; // Red
 </script>
 
 <svelte:window on:keydown={handleKeydown} />
@@ -75,63 +97,66 @@
 >
     <!-- Modal Content -->
     <div
-        class="bg-[#151519] border border-[#2a2a2f] rounded-lg shadow-2xl w-[520px] overflow-hidden flex flex-col relative max-h-[90vh] font-sans"
+        class="bg-[#f5f6f7] rounded-lg shadow-2xl w-[520px] overflow-hidden flex flex-col relative max-h-[90vh] font-sans"
         transition:scale={{ start: 0.98, duration: 200 }}
     >
         <!-- Header (Compact) -->
         <div
-            class="px-5 py-3 border-b border-[#2a2a2f] flex justify-between items-center bg-[#151519] shrink-0"
+            class="px-5 py-3 flex justify-between items-center bg-[#d50032] shrink-0"
         >
             <div class="flex items-center gap-2">
-                <div
-                    class="w-2 h-2 rounded-full bg-[#4ade80] animate-pulse"
-                ></div>
-                <h2 class="text-base font-semibold text-white tracking-wide">
-                    AI Match Intelligence
-                </h2>
+                <img
+                    src={chrome.runtime.getURL("assets/logo.png")}
+                    alt="Betclic AI"
+                    class="h-9 w-auto object-contain"
+                />
             </div>
             <button
                 on:click={onClose}
-                class="text-[#6b6b75] hover:text-white transition-colors bg-transparent border-0 p-1 cursor-pointer leading-none text-lg"
+                class="text-white/80 hover:text-white transition-colors bg-transparent border-0 p-1 cursor-pointer leading-none text-xl"
                 >&times;</button
             >
         </div>
 
         <!-- Body -->
-        <div class="flex-1 flex flex-col">
+        <div class="flex-1 flex flex-col overflow-y-auto">
             {#if stats && stats.probs}
-                <div class="p-6">
+                <div class="p-6 flex flex-col gap-6">
                     <!-- 1. Probabilities (Compact Bar) -->
-                    <div class="mb-5">
+                    <div
+                        class="bg-white p-4 rounded-lg shadow-sm border border-[#e5e7eb]"
+                    >
                         <div
-                            class="flex justify-between text-sm text-[#8a8a95] font-medium mb-2 uppercase tracking-wider"
+                            class="flex justify-between text-sm text-[#6b7280] font-medium mb-2 uppercase tracking-wider"
                         >
                             <span>Home</span>
                             <span>Draw</span>
                             <span>Away</span>
                         </div>
                         <div
-                            class="flex h-3 rounded overflow-hidden bg-[#1e1e24]"
+                            class="flex h-3 rounded overflow-hidden bg-[#e5e7eb]"
                         >
                             <div
                                 class="bg-[#3d8c4a] h-full"
                                 style="width: {stats.probs.home}%"
                             ></div>
                             <div
-                                class="bg-[#5a5a65] h-full"
+                                class="bg-[#9ca3af] h-full"
                                 style="width: {stats.probs.draw}%"
                             ></div>
                             <div
-                                class="bg-[#6b6b75] h-full"
+                                class="bg-[#4b5563] h-full"
                                 style="width: {stats.probs.away}%"
                             ></div>
                         </div>
                     </div>
 
                     <!-- 2. Radar Chart (Spider Web) -->
-                    <div class="mb-5">
+                    <div
+                        class="bg-white p-4 rounded-lg shadow-sm border border-[#e5e7eb]"
+                    >
                         <h3
-                            class="text-sm text-[#8a8a95] mb-3 font-medium uppercase tracking-wide"
+                            class="text-sm text-[#6b7280] mb-3 font-medium uppercase tracking-wide text-center"
                         >
                             Porównanie Drużyn
                         </h3>
@@ -151,7 +176,7 @@
                                             })
                                             .join(" ")}
                                         fill="none"
-                                        stroke="#2a2a2f"
+                                        stroke="#e5e7eb"
                                         stroke-width="1"
                                     />
                                 {/each}
@@ -163,7 +188,7 @@
                                         y1={cy}
                                         x2={cx + maxRadius * Math.cos(angle)}
                                         y2={cy + maxRadius * Math.sin(angle)}
-                                        stroke="#2a2a2f"
+                                        stroke="#e5e7eb"
                                         stroke-width="1"
                                     />
                                 {/each}
@@ -227,7 +252,7 @@
                                                 Math.sin(radarAngles[i])}
                                         text-anchor="middle"
                                         dominant-baseline="middle"
-                                        class="fill-[#8a8a95] text-[8px] font-medium"
+                                        class="fill-[#374151] text-[8px] font-medium"
                                     >
                                         {label}
                                     </text>
@@ -240,7 +265,7 @@
                                 <div
                                     class="w-3 h-3 rounded-full bg-[#4ade80]"
                                 ></div>
-                                <span class="text-sm text-[#a0a0a8]"
+                                <span class="text-sm text-[#4b5563]"
                                     >{homeTeamName}</span
                                 >
                             </div>
@@ -248,7 +273,7 @@
                                 <div
                                     class="w-3 h-3 rounded-full bg-[#ef4444]"
                                 ></div>
-                                <span class="text-sm text-[#a0a0a8]"
+                                <span class="text-sm text-[#4b5563]"
                                     >{awayTeamName}</span
                                 >
                             </div>
@@ -256,14 +281,16 @@
                     </div>
 
                     <!-- 3. Analysis Text -->
-                    <div>
+                    <div
+                        class="bg-white p-4 rounded-lg shadow-sm border border-[#e5e7eb]"
+                    >
                         <h3
-                            class="text-sm text-[#8a8a95] mb-3 font-medium uppercase tracking-wide"
+                            class="text-sm text-[#6b7280] mb-3 font-medium uppercase tracking-wide"
                         >
                             Analiza Ekspercka
                         </h3>
                         <div
-                            class="text-[#c5c5cc] text-base leading-relaxed analysis-content"
+                            class="text-[#374151] text-base leading-relaxed analysis-content"
                         >
                             {@html analysis}
                         </div>
@@ -272,7 +299,7 @@
             {:else}
                 <!-- Loading State placeholder if stats missing but modal open -->
                 <div
-                    class="flex-1 flex items-center justify-center text-[#6b6b75]"
+                    class="flex-1 flex items-center justify-center text-[#6b7280]"
                 >
                     <span class="animate-pulse"
                         >Analizowanie danych meczowych...</span
@@ -283,17 +310,17 @@
 
         <!-- Footer -->
         <div
-            class="p-4 bg-[#101014] border-t border-[#2a2a2f] flex justify-between items-center shrink-0"
+            class="p-4 bg-white border-t border-[#e5e7eb] flex justify-between items-center shrink-0"
         >
             <div class="flex flex-col">
-                <span class="text-sm text-[#6b6b75]">Pewność Typu</span>
-                <div class="text-[#4ade80] font-bold text-base">
-                    Wysoka (78%)
+                <span class="text-sm text-[#6b7280]">Pewność Typu</span>
+                <div class="{confidenceColor} font-bold text-base">
+                    {confidenceLabel} ({Math.round(maxProb)}%)
                 </div>
             </div>
             <button
                 on:click={onClose}
-                class="px-6 py-2 bg-[#2a2a2f] hover:bg-[#3a3a45] text-white text-base rounded border-0 transition-colors font-medium cursor-pointer"
+                class="px-6 py-2 bg-[#fce500] hover:bg-[#e6d000] text-[#0d1620] text-base rounded border-0 transition-colors font-bold cursor-pointer uppercase shadow-sm"
                 >Zamknij</button
             >
         </div>
