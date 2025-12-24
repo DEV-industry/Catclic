@@ -1,9 +1,13 @@
 <script>
     import "../style.css"; // Ensure styles are applied if available, or just use Tailwind classes
     import { onMount } from "svelte";
+    import { scale } from "svelte/transition";
 
     let activeTab = "home"; // home, settings
     let matchCount = 3;
+    let dateFilter = "today"; // today, tomorrow, all
+    let sportFilter = "all"; // all, football, tennis, basketball
+    let showFilters = false;
 
     function handleSklejKupon() {
         // Send message to the content script in the active tab
@@ -12,6 +16,10 @@
                 chrome.tabs.sendMessage(tabs[0].id, {
                     action: "ACTION_SKLEJ_KUPON",
                     count: matchCount,
+                    filters: {
+                        date: dateFilter,
+                        sport: sportFilter,
+                    },
                 });
                 window.close(); // Close popup after action
             }
@@ -64,6 +72,73 @@
 
         <!-- Action Area -->
         <div class="flex flex-col gap-4">
+            <!-- Filter Toggle -->
+            <div class="flex justify-end">
+                <button
+                    on:click={() => (showFilters = !showFilters)}
+                    class="text-xs text-[#6b7280] font-bold uppercase tracking-wider flex items-center gap-2 hover:text-[#d50032] transition-colors bg-transparent border-0 cursor-pointer p-0"
+                >
+                    <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                    >
+                        <polygon
+                            points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"
+                        ></polygon>
+                    </svg>
+                    Filtry i Ustawienia
+                </button>
+            </div>
+
+            <!-- Filters (Collapsible) -->
+            {#if showFilters}
+                <div
+                    class="grid grid-cols-2 gap-3"
+                    transition:scale={{ duration: 200, start: 0.95 }}
+                >
+                    <div
+                        class="bg-white p-3 rounded-lg shadow-sm border border-[#e5e7eb]"
+                    >
+                        <label
+                            class="text-[10px] text-[#6b7280] font-bold uppercase tracking-wider block mb-2"
+                            >Data</label
+                        >
+                        <select
+                            bind:value={dateFilter}
+                            class="w-full text-sm bg-transparent border-none outline-none font-medium text-[#0d1620] cursor-pointer"
+                        >
+                            <option value="today">Dzisiaj</option>
+                            <option value="tomorrow">Jutro</option>
+                            <option value="all">Wszystkie</option>
+                        </select>
+                    </div>
+                    <div
+                        class="bg-white p-3 rounded-lg shadow-sm border border-[#e5e7eb]"
+                    >
+                        <label
+                            class="text-[10px] text-[#6b7280] font-bold uppercase tracking-wider block mb-2"
+                            >Sport</label
+                        >
+                        <select
+                            bind:value={sportFilter}
+                            class="w-full text-sm bg-transparent border-none outline-none font-medium text-[#0d1620] cursor-pointer"
+                        >
+                            <option value="all">Auto</option>
+                            <option value="football">Piłka Nożna</option>
+                            <option value="tennis">Tenis</option>
+                            <option value="basketball">Koszykówka</option>
+                        </select>
+                    </div>
+                </div>
+            {/if}
+
             <div
                 class="bg-white p-4 rounded-lg shadow-sm border border-[#e5e7eb]"
             >

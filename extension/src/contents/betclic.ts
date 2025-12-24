@@ -19,142 +19,362 @@ export const getStyle = () => {
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === "ACTION_SKLEJ_KUPON") {
         console.log("Received Sklej Kupon command", request);
-        handleAutoCoupon(request.count || 3);
+        handleAutoCoupon(request.count || 3, request.filters);
     }
 });
 
-// --- HELPER: CHECK IF MATCH IS TODAY ---
-function isToday(element: HTMLElement): boolean {
-    // Strategy: Look for time text or "Dzisiaj".
-    // 1. Check for "Dzisiaj" text explicitly
-    if (element.innerText.includes("Dzisiaj")) return true;
+// --- HELPER: CHECK IF MATCH IS VALID (Date Filter) ---
+function isMatchValid(element: HTMLElement, dateFilter: string): boolean {
+    const text = element.innerText.toLowerCase();
 
-    // 2. Check for date patterns (dd.mm or dd/mm)
-    // If we see a date like "27.12" or "27/12" and it's NOT today's date, return false.
-    // If matches only have HH:MM, they are usually today.
+    // 1. Filter: TODAY
+    if (dateFilter === "today") {
+        if (text.includes("jutro") || text.includes("pojutrze")) return false;
+        if (text.includes("dzisiaj")) return true;
 
-    // Heuristic: If it contains a date format that is NOT today, assuming non-today.
-    // However, Betclic mostly shows "Dzisiaj" or just time for today.
-    // Future matches show "Jutro" or "Pt. 27/12".
+        // Strict date check for today
+        const today = new Date();
+        const d = String(today.getDate()).padStart(2, '0');
+        const m = String(today.getMonth() + 1).padStart(2, '0');
+        const todayStr = `${d}.${m}`;
+        const todayStrSlash = `${d}/${m}`;
 
-    // So, strict check:
-    // If it says "Jutro", "Pojutrze", or match regex for future date -> False
-    // If it says "Dzisiaj" or has NO date (only time) -> True (risky but common)
-
-    const text = element.innerText;
-
-    if (text.includes("Jutro")) return false;
-    if (text.includes("Pojutrze")) return false;
-
-    // Check for DD.MM format
-    const today = new Date();
-    const day = String(today.getDate()).padStart(2, '0');
-    const month = String(today.getMonth() + 1).padStart(2, '0');
-    const todayStr = `${day}.${month}`; // 24.12
-    const todayStrSlash = `${day}/${month}`; // 24/12
-
-    // Find all dates in text
-    const dateMatches = text.match(/\d{1,2}[./]\d{2}/g);
-    if (dateMatches) {
-        // If any date found is NOT today, then it's not today
-        // (Assuming a match container doesn't contain multiple dates for different events)
-        const isFuture = dateMatches.some(d => d !== todayStr && d !== todayStrSlash);
-        if (isFuture) return false;
+        const dateMatches = text.match(/\d{1,2}[./]\d{2}/g);
+        if (dateMatches) {
+            // If date found is NOT today, return false
+            return !dateMatches.some(date => date !== todayStr && date !== todayStrSlash);
+        }
+        return true; // Default to true if only time is shown
     }
 
-    return true; // Default to true if no counter-evidence found (e.g. only time shown)
+    // 2. Filter: TOMORROW
+    if (dateFilter === "tomorrow") {
+        if (text.includes("jutro")) return true;
+
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        const d = String(tomorrow.getDate()).padStart(2, '0');
+        const m = String(tomorrow.getMonth() + 1).padStart(2, '0');
+        const tomStr = `${d}.${m}`;
+        const tomStrSlash = `${d}/${m}`;
+
+        return text.includes(tomStr) || text.includes(tomStrSlash);
+    }
+
+    // 3. Filter: ALL
+    return true;
 }
 
 // --- HELPER: CLEAR COUPON ---
 async function clearCoupon() {
     console.log("Attempting to clear coupon...");
 
-    // Strategy 1: Look for a "Remove All" / Trash icon button in the basket header
-    // Betclic often has a trash icon: .icon_trash, or a button with "Wyczyść"
-    const removeAllBtn = document.querySelector('button.basket-header-action--remove, .icon_trash, [data-qa="basket-remove-all"]') as HTMLElement;
+    // Helper: Wait function
+    const wait = (ms: number) => new Promise(r => setTimeout(r, ms));
+
+    // Helper: Get current bet count from header text (e.g. "8 zdarzeń")
+    const getBetCount = (): number => {
+        // Look for the header text containing "zdarzeń" or "events"
+        const headers = Array.from(document.querySelectorAll('h2, span, div')) as HTMLElement[];
+        const header = headers.find(el => el.innerText && /^\d+\s+(zdarzeń|events|bets)/i.test(el.innerText));
+
+        if (header) {
+            const num = parseInt(header.innerText.match(/^(\d+)/)?.[1] || "0", 10);
+            return num;
+        }
+
+        // Fallback: Check number of remove buttons visible
+        const removeBtns = document.querySelectorAll('button[aria-label="Usuń"], .basket-item-remove, .icon_cross');
+        return removeBtns.length;
+    };
+
+    let initialCount = getBetCount();
+    console.log(`Initial bet count: ${initialCount}`);
+
+    if (initialCount === 0) {
+        console.log("Coupon is already empty.");
+        return;
+    }
+
+    // Strategy 1: "Remove All" (Bin Icon / Text)
+    // Selectors found in typical Betclic HTML or common patterns
+    const removeAllSelectors = [
+        'button[aria-label="Usuń wszystko"]',
+        '[data-qa="basket-remove-all"]',
+        '.basket-header-action--remove',
+        '.icon_trash',
+        'button.basket-clear-btn'
+    ];
+
+    const removeAllBtn = document.querySelector(removeAllSelectors.join(', ')) as HTMLElement;
 
     if (removeAllBtn) {
         console.log("Found 'Remove All' button, clicking...");
         removeAllBtn.click();
+        await wait(500); // Wait for potential modal
 
-        // Sometimes a confirmation modal appears "Czy na pewno chcesz usunąć?"
-        // We need to wait a tiny bit and confirm if it shows up
-        await new Promise(r => setTimeout(r, 300));
-        const confirmBtn = document.querySelector('button.bcl-modal-footer__btn--primary, [data-qa="modal-confirm"]') as HTMLElement;
+        // Confirm modal if exists
+        const confirmSelectors = [
+            'button.bcl-modal-footer__btn--primary',
+            '[data-qa="modal-confirm"]',
+            'button[data-test="modal-confirm-button"]',
+            '.modal-footer button.primary'
+        ];
+
+        const confirmBtn = document.querySelector(confirmSelectors.join(', ')) as HTMLElement;
         if (confirmBtn) {
+            console.log("Confirming removal...");
             confirmBtn.click();
+            await wait(800);
         }
-        await new Promise(r => setTimeout(r, 500)); // Wait for clearance
-        return;
+
+        // Check if cleared
+        if (getBetCount() === 0) {
+            console.log("Coupon cleared via 'Remove All'.");
+            return;
+        }
+        console.log("Strategy 1 incomplete. Falling back to iterative.");
     }
 
-    // Strategy 2: Click individual remove buttons (X) for each bet
-    const removeButtons = Array.from(document.querySelectorAll('button.basket-item-remove, .icon_cross, [data-qa="basket-item-remove"]'));
-    if (removeButtons.length > 0) {
-        console.log(`Found ${removeButtons.length} individual bets to remove.`);
-        for (const btn of removeButtons) {
-            (btn as HTMLElement).click();
-            await new Promise(r => setTimeout(r, 100)); // Small delay between clicks
+    // Strategy 2: Iterative Delete (Count Aware)
+    console.log("Strategy 1 failed/skipped. Trying iterative removal.");
+
+    // Selectors for individual delete buttons (X icons)
+    const removeSelectors = [
+        '[data-qa="basket-item-remove"]',
+        'button.basket-item-remove',
+        '.basket-item__action--remove',
+        '.icon_cross',
+        'svg.bcl-basket-item__remove-icon',
+        'button[aria-label="Usuń"]'
+    ];
+
+    // Safety limit to prevent infinite loops
+    let safetyLimit = 30;
+    let retryCount = 0;
+
+    while (getBetCount() > 0 && safetyLimit > 0) {
+        // Find the FIRST remove button currently in DOM
+        const btn = document.querySelector(removeSelectors.join(', ')) as HTMLElement;
+
+        if (!btn) {
+            // Logic: Buttons might be hidden if coupon collapsed? 
+            // Or maybe lagging.
+            console.log("No remove buttons found but count > 0. UI might be lagging or collapsed.");
+
+            if (retryCount < 3) {
+                console.log("Retrying search...");
+                retryCount++;
+                await wait(500);
+                continue;
+            } else {
+                break;
+            }
         }
-        await new Promise(r => setTimeout(r, 500)); // Wait for final clearance
+
+        // Reset retry count if we found a button
+        retryCount = 0;
+
+        // Try to click the wrapper button if we found an icon/svg
+        const clickable = btn.closest('button') || btn;
+
+        try {
+            clickable.click();
+        } catch (e) {
+            console.error("Error clicking remove button", e);
+        }
+
+        // Wait for DOM update - Critical for React/Vue apps to re-render list
+        await wait(400);
+        safetyLimit--;
+    }
+
+    if (getBetCount() > 0) {
+        console.warn(`Safety limit reached. Coupon still has ${getBetCount()} bets.`);
+    } else {
+        console.log("Coupon clearance complete.");
     }
 }
 
 // --- AUTO COUPON LOGIC ---
-async function handleAutoCoupon(maxMatches: number) {
-    // 1. Clear existing coupon first
-    await clearCoupon();
 
+interface AutoCouponSession {
+    active: boolean;
+    target: number;
+    current: number;
+    visitedUrls: string[];
+    filters: {
+        date: string;
+        sport: string;
+    };
+}
+
+// --- HELPER: STORAGE ---
+const getSession = async (): Promise<AutoCouponSession> => {
+    const data = await chrome.storage.local.get("autoCouponSession");
+    return data.autoCouponSession || {
+        active: false,
+        target: 0,
+        current: 0,
+        visitedUrls: [],
+        filters: { date: "today", sport: "all" }
+    };
+};
+
+const setSession = async (session: AutoCouponSession) => {
+    await chrome.storage.local.set({ autoCouponSession: session });
+};
+
+// --- NAVIGATION HELPER ---
+function navigateToNextLeague(visited: string[], sportFilter: string) {
+    // Strategy: Find sidebar or main navigation links.
+    // Betclic URLs usually contain "-s" (Sport) or "-c" (Competition) ids.
+    // e.g., /pilka-nozna-s1, /premier-league-c3
+    const set = new Set(visited);
+
+    // Broaden selector to get most internal links
+    const allLinks = Array.from(document.querySelectorAll('a[href]')) as HTMLAnchorElement[];
+
+    // Filter relevant links
+    const candidates = allLinks.filter(a => {
+        const href = a.href;
+
+        // 1. Must be same origin (internal link)
+        if (!href.startsWith(window.location.origin)) return false;
+
+        // 2. Avoid homepage/live
+        if (href === window.location.origin + "/" || href.endsWith(".pl/")) return false;
+        if (href.includes("/live/")) return false; // Usually want pre-match
+
+        // 3. Avoid account/policy/irrelevant pages
+        if (href.includes("my-account") || href.includes("terms") || href.includes("login")) return false;
+
+        // 4. MUST match a content pattern (Sport or Competition ID)
+        const isSportOrComp = /-[sc]\d+(\/|$)/.test(href);
+        const isFootball = href.includes("pilka-nozna");
+
+        if (!isSportOrComp && !isFootball) return false;
+
+        // --- SPORT FILTER ---
+        if (sportFilter !== "all") {
+            const lowerHref = href.toLowerCase();
+            if (sportFilter === "football" && !lowerHref.includes("pilka-nozna")) return false;
+            if (sportFilter === "tennis" && !lowerHref.includes("tenis")) return false;
+            if (sportFilter === "basketball" && !lowerHref.includes("koszykowka")) return false;
+        }
+
+        // 5. Avoid current and visited
+        if (href === window.location.href) return false;
+        if (set.has(href)) return false;
+
+        return true;
+    });
+
+    if (candidates.length > 0) {
+        // Prefer competition links (-c) over sport links (-s) if available, as they are more specific
+        const compLinks = candidates.filter(a => a.href.includes("-c"));
+        const finalPool = compLinks.length > 0 ? compLinks : candidates;
+
+        // Pick random
+        const next = finalPool[Math.floor(Math.random() * finalPool.length)];
+        console.log("Navigating to next league:", next.href);
+        showToast(`Przechodzę do: ${next.innerText || "kolejnej ligi"}...`);
+        window.location.href = next.href;
+    } else {
+        console.log("No more leagues found to navigate.");
+        showToast("Nie znaleziono więcej unikalnych lig do przeszukania.");
+        setSession({
+            active: false,
+            target: 0,
+            current: 0,
+            visitedUrls: [],
+            filters: { date: "today", sport: "all" }
+        });
+    }
+}
+
+// --- CORE LOGIC ---
+async function processAutoCoupon() {
+    const session = await getSession();
+    if (!session.active) return;
+
+    console.log("Processing Auto Coupon Session:", session);
+
+    // 1. Find matches on current page
     const containers = MatchParser.findPossibleMatchContainers();
-    console.log(`Found ${containers.length} potential matches for coupon`);
-
-    let addedCount = 0;
-
-
-    // Use a Set to avoid adding multiple bets from same match (though simple iteration usually suffices)
+    let addedOnPage = 0;
 
     for (const container of containers) {
-        if (addedCount >= maxMatches) break;
+        if (session.current >= session.target) break;
 
-        // DATE FILTER
-        if (!isToday(container)) {
-            // console.log("Skipping match, not today");
-            continue;
-        }
+        // Use Filter Check
+        // Default to "today" if older session format
+        const dateFilter = session.filters?.date || "today";
+        if (!isMatchValid(container, dateFilter)) continue;
 
         const data = MatchParser.parse(container);
         if (!data || !data.elementA) continue;
 
-        // STRATEGY: Select Home Team (elementA) for now.
-        // In future: Use prediction logic to select the best one.
-        const targetButton = data.elementA;
+        // Check if already selected (simple check if button is green/active?)
+        // Assuming click for now
+        data.elementA.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        data.elementA.click();
 
-        // Check if already selected (Betclic adds 'is-selected' or similar class usually, depends on site)
-        // If we can't detect, clicking it again might toggle it OFF. 
-        // For now, let's assume we want to click it.
-
-        // Scroll into view gently
-        targetButton.scrollIntoView({ behavior: 'smooth', block: 'center' });
-
-        // Click
-        targetButton.click();
-
-        // Visual feedback
-        const originalBg = targetButton.style.backgroundColor;
-        targetButton.style.backgroundColor = "#4ade80"; // flash green
+        // Visual flash
+        const originalBg = data.elementA.style.backgroundColor;
+        const el = data.elementA; // Capture for closure
+        el.style.backgroundColor = "#4ade80";
         setTimeout(() => {
-            targetButton.style.backgroundColor = originalBg;
+            if (el) el.style.backgroundColor = originalBg;
         }, 500);
 
-        console.log(`Added match to coupon: ${data.teamA} vs ${data.teamB}`);
-        addedCount++;
+        session.current++;
+        addedOnPage++;
+
+        // Small delay to prevent rate limit / UI glitch
+        await new Promise(r => setTimeout(r, 400));
     }
 
-    if (addedCount > 0) {
-        showToast(`Dodano ${addedCount} mecze z dnia dzisiejszego!`);
-    } else {
-        showToast("Nie znaleziono odpowiednich meczów na dzisiaj.");
+    if (addedOnPage > 0) {
+        showToast(`Dodano ${addedOnPage} meczy. Razem: ${session.current}/${session.target}`);
     }
+
+    // 2. Check status
+    if (session.current >= session.target) {
+        showToast("Kupon gotowy! Zebrano wymaganą liczbę meczy.");
+        await setSession({ ...session, active: false });
+    } else {
+        // Need more? Navigate!
+        console.log(`Need ${session.target - session.current} more. Navigating...`);
+        showToast(`Szukam dalej... Brakuje ${session.target - session.current}`);
+
+        // Add current URL to visited
+        session.visitedUrls.push(window.location.href);
+        await setSession(session);
+
+        // Navigate
+        const sportFilter = session.filters?.sport || "all";
+        setTimeout(() => navigateToNextLeague(session.visitedUrls, sportFilter), 1500);
+    }
+}
+
+// --- TRIGGER ---
+async function handleAutoCoupon(maxMatches: number, filters: { date: string, sport: string } = { date: "today", sport: "all" }) {
+    // 1. Clear existing coupon first (Only on manual trigger)
+    await clearCoupon();
+
+    // 2. Start Session
+    const session: AutoCouponSession = {
+        active: true,
+        target: maxMatches,
+        current: 0,
+        visitedUrls: [window.location.href],
+        filters: filters
+    };
+    await setSession(session);
+
+    // 3. Process current page immediately
+    processAutoCoupon();
 }
 
 function showToast(message: string) {
@@ -204,6 +424,7 @@ function replaceLogoWithCustom() {
             a[data-qa="commonLogo"] .icons.icon_logoBetclicFill,
             a[data-qa="commonLogo"] .icon_logoBetclicFill {
                 display: none !important;
+                content: none !important;
             }
         `;
         document.head.appendChild(hideStyles);
@@ -295,4 +516,7 @@ window.addEventListener("load", () => {
     replaceLogoWithCustom();
     scanAndInject();
     observer.observe(document.body, { childList: true, subtree: true });
+
+    // Resume Auto-Coupon if active
+    setTimeout(processAutoCoupon, 2000); // Wait for initial load
 });
