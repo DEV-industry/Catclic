@@ -24,6 +24,76 @@ export const showToast = (message: string) => {
     }, 3000);
 }
 
+// --- LOADING OVERLAY ---
+export const showLoadingOverlay = (message: string) => {
+    // Check if already exists
+    let overlay = document.getElementById('betclic-ai-overlay');
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'betclic-ai-overlay';
+        Object.assign(overlay.style, {
+            position: 'fixed',
+            inset: '0',
+            backgroundColor: 'rgba(0, 0, 0, 0.7)',
+            backdropFilter: 'blur(8px)',
+            zIndex: '9999999',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: 'white',
+            fontFamily: 'sans-serif',
+            transition: 'opacity 0.3s ease'
+        });
+
+        // Create Spinner
+        const spinner = document.createElement('div');
+        Object.assign(spinner.style, {
+            width: '50px',
+            height: '50px',
+            borderRadius: '50%',
+            border: '4px solid rgba(255, 255, 255, 0.1)',
+            borderTopColor: '#d50032', // Betclic Red
+            animation: 'spin 1s linear infinite',
+            marginBottom: '20px'
+        });
+
+        // Add keyframes if not exists
+        if (!document.getElementById('spin-anim')) {
+            const style = document.createElement('style');
+            style.id = 'spin-anim';
+            style.innerHTML = `@keyframes spin { to { transform: rotate(360deg); } }`;
+            document.head.appendChild(style);
+        }
+
+        const msgEl = document.createElement('div');
+        msgEl.id = 'betclic-ai-overlay-msg';
+        msgEl.style.fontSize = '18px';
+        msgEl.style.fontWeight = '500';
+        msgEl.innerText = message;
+
+        overlay.appendChild(spinner);
+        overlay.appendChild(msgEl);
+        document.body.appendChild(overlay);
+    } else {
+        // Update message
+        const msgEl = document.getElementById('betclic-ai-overlay-msg');
+        if (msgEl) msgEl.innerText = message;
+    }
+}
+
+export const hideLoadingOverlay = () => {
+    const overlay = document.getElementById('betclic-ai-overlay');
+    if (overlay) {
+        overlay.style.opacity = '0';
+        setTimeout(() => {
+            if (overlay && overlay.parentNode) {
+                overlay.parentNode.removeChild(overlay);
+            }
+        }, 300);
+    }
+}
+
 export const replaceLogoWithCustom = () => {
     // Inject CSS to hide the Betclic text/icon (::before pseudo element)
     if (!document.getElementById('custom-logo-styles')) {

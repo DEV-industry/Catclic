@@ -1,6 +1,6 @@
 import type { PlasmoCSConfig } from "plasmo"
-import { handleAutoCoupon, processAutoCoupon } from "../services/AutoCouponManager"
-import { replaceLogoWithCustom } from "../services/UIService"
+import { handleAutoCoupon, processAutoCoupon, getSession } from "../services/AutoCouponManager"
+import { replaceLogoWithCustom, showLoadingOverlay } from "../services/UIService"
 import { scanAndInject } from "../services/PredictionInjector"
 
 // @ts-ignore
@@ -36,11 +36,28 @@ const observer = new MutationObserver((mutations) => {
     scanAndInject();
 });
 
+// Fast Restore Overlay
+async function checkAndRestoreOverlay() {
+    try {
+        const session = await getSession();
+        if (session.active) {
+            // Show immediate overlay to prevent flash
+            showLoadingOverlay(`Wczytywanie oferty... ${session.current}/${session.target}`);
+        }
+    } catch (e) {
+        console.error("Failed to restore overlay:", e);
+    }
+}
+
+// Run immediately to catch it as fast as possible
+checkAndRestoreOverlay();
+
 window.addEventListener("load", () => {
     replaceLogoWithCustom();
     scanAndInject();
     observer.observe(document.body, { childList: true, subtree: true });
 
     // Resume Auto-Coupon if active
-    setTimeout(processAutoCoupon, 2000); // Wait for initial load
+    // The overlay is already shown by checkAndRestoreOverlay, so we can wait safe 2s for parsing
+    setTimeout(processAutoCoupon, 2000);
 });

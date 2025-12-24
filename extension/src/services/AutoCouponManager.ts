@@ -1,6 +1,6 @@
 import { MatchParser } from "./MatchParser"
 import { clearCoupon, isMatchValid } from "./CouponManager"
-import { showToast } from "./UIService"
+import { showToast, showLoadingOverlay, hideLoadingOverlay } from "./UIService"
 
 export interface AutoCouponSession {
     active: boolean;
@@ -137,52 +137,53 @@ export async function processAutoCoupon() {
     const session = await getSession();
     if (!session.active) return;
 
+    // Show Overlay immediately
+    showLoadingOverlay(`AI analizuje mecze... ${session.current}/${session.target}`);
+
     console.log("Processing Auto Coupon Session:", session);
 
     // 0. STRICT SPORT CHECK
-    // If we somehow drifted to a wrong page (e.g. user clicked something), stop or redirect.
-    // However, mainly we want to avoid validating on "Popular" or "Live" if strict filtering is on.
     const sportFilter = session.filters?.sport || "all";
     if (!isCurrentPageValidForSport(sportFilter)) {
         console.log(`Current page invalid for sport '${sportFilter}'. Navigating...`);
-        // Add current URL to visited to avoid easy loops, though direct navigation overrides this
         session.visitedUrls.push(window.location.href);
+
+        showLoadingOverlay(`Przechodzenie do kategorii: ${sportFilter}...`);
         navigateToSportCategory(sportFilter);
-        return; // Stop execution on this page
+        // Note: verify if we need to hide overlay? Navigation usually clears page, but overlay might persist if SPA. 
+        // Betclic seems to be MPA/SPA hybrid. Let's keep overlay until unload.
+        return;
     }
 
     // 1. Find matches on current page
+    showLoadingOverlay(`Skanowanie oferty... ${session.current}/${session.target}`);
     const containers = MatchParser.findPossibleMatchContainers();
     let addedOnPage = 0;
 
     for (const container of containers) {
         if (session.current >= session.target) break;
 
-        // Use Filter Check
-        // Default to "today" if older session format
         const dateFilter = session.filters?.date || "today";
         if (!isMatchValid(container, dateFilter)) continue;
 
         const data = MatchParser.parse(container);
         if (!data || !data.elementA) continue;
 
-        // Check if already selected (simple check if button is green/active?)
-        // Assuming click for now
+        // Visual / Action
         data.elementA.scrollIntoView({ behavior: 'smooth', block: 'center' });
         data.elementA.click();
 
-        // Visual flash
         const originalBg = data.elementA.style.backgroundColor;
-        const el = data.elementA; // Capture for closure
+        const el = data.elementA;
         el.style.backgroundColor = "#4ade80";
-        setTimeout(() => {
-            if (el) el.style.backgroundColor = originalBg;
-        }, 500);
+        setTimeout(() => { if (el) el.style.backgroundColor = originalBg; }, 500);
 
         session.current++;
         addedOnPage++;
 
-        // Small delay to prevent rate limit / UI glitch
+        // Update overlay
+        showLoadingOverlay(`Dodano mecz: ${data.teamA} vs ${data.teamB} (${session.current}/${session.target})`);
+
         await new Promise(r => setTimeout(r, 400));
     }
 
@@ -194,24 +195,30 @@ export async function processAutoCoupon() {
     if (session.current >= session.target) {
         showToast("Kupon gotowy! Zebrano wymaganą liczbę meczy.");
         await setSession({ ...session, active: false });
+        // DONE! Hide overlay
+        hideLoadingOverlay();
     } else {
-        // Need more? Navigate!
         console.log(`Need ${session.target - session.current} more. Navigating...`);
         showToast(`Szukam dalej... Brakuje ${session.target - session.current}`);
 
-        // Add current URL to visited
+        showLoadingOverlay(`Szukam kolejnych lig... Brakuje ${session.target - session.current}`);
+
         session.visitedUrls.push(window.location.href);
         await setSession(session);
 
-        // Navigate
         setTimeout(() => navigateToNextLeague(session.visitedUrls, sportFilter), 1500);
     }
 }
 
 // --- TRIGGER ---
 export async function handleAutoCoupon(maxMatches: number, filters: { date: string, sport: string } = { date: "today", sport: "all" }) {
+    // 0. Show Overlay
+    showLoadingOverlay("Inicjalizacja AI...");
+
     // 1. Clear existing coupon first (Only on manual trigger)
     await clearCoupon();
+
+    showLoadingOverlay("Tworzenie sesji...");
 
     // 2. Start Session
     const session: AutoCouponSession = {
@@ -225,9 +232,9 @@ export async function handleAutoCoupon(maxMatches: number, filters: { date: stri
 
     // 3. CHECK SPORT LOCATION IMMEDIATELY
     if (!isCurrentPageValidForSport(filters.sport)) {
-        console.log(`Starting AutoCoupon but wrong sport page. Redirecting to ${filters.sport}...`);
+        showLoadingOverlay(`Przekierowanie do: ${filters.sport}`);
         navigateToSportCategory(filters.sport);
-        return; // Will resume after page load via window.load in betclic.ts
+        return;
     }
 
     // 4. Process current page immediately if valid
