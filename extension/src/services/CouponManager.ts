@@ -50,7 +50,19 @@ const findByText = (selector: string, text: string): HTMLElement | undefined => 
 };
 
 // Helper: Get current bet count
-const getBetCount = (): number => {
+export const getBetCount = (): number => {
+    // Strategy: Target specific header title from screenshot
+    const countEl = document.querySelector('.progressiveBettingSlip_headerTitle span') as HTMLElement;
+    if (countEl && countEl.innerText) {
+        const text = countEl.innerText;
+        // Matches "0 zdarzeń", "1 zdarzenie", etc.
+        const match = text.match(/^(\d+)/);
+        if (match) {
+            return parseInt(match[1], 10);
+        }
+    }
+
+    // Fallback: older selectors just in case
     const headers = Array.from(document.querySelectorAll('h2, span, div')) as HTMLElement[];
     const header = headers.find(el => el.innerText && /^\d+\s+(zdarzeń|events|bets|zdarzenie)/i.test(el.innerText));
 
@@ -59,138 +71,58 @@ const getBetCount = (): number => {
         return num;
     }
 
-    // Fallback checks
-    const removeBtns = document.querySelectorAll('button[aria-label="Usuń"], .basket-item-remove, .icon_cross');
-    return removeBtns.length;
+    return 0; // Default if nothing found, though unsafe.
 };
 
 // --- HELPER: CLEAR COUPON ---
-export async function clearCoupon() {
-    console.log("Attempting to clear coupon...");
+export async function clearCoupon(): Promise<boolean> {
+    console.log("Attempting to clear coupon [Iterative Mode]...");
 
-    let initialCount = getBetCount();
-    console.log(`Initial bet count: ${initialCount}`);
+    // Max attempts to prevent infinite loops (e.g. 20 events max)
+    const MAX_ATTEMPTS = 20;
 
-    if (initialCount === 0) {
-        console.log("Coupon is already empty.");
-        return;
-    }
+    for (let i = 0; i < MAX_ATTEMPTS; i++) {
+        const currentCount = getBetCount();
+        console.log(`Clear loop check: ${currentCount} items remaining (Iteration ${i + 1})`);
 
-    // --- Strategy 1: "Remove All" via Menu (Three dots -> Remove all) ---
-    console.log("Strategy 1: Trying 'Three Dots' menu removal...");
+        if (currentCount === 0) {
+            console.log("Coupon is empty. Success.");
+            return true;
+        }
 
-    // 1. Find the menu button
-    const couponHeader = document.querySelector('.basket-header, .bcl-basket-header') as HTMLElement;
+        // Find any "remove" button (usually an X icon)
+        // Selectors:
+        // - .icon_close: Standard Betclic close icon
+        // - button containing .icon_close
+        // - bcdk-icon-close: sometimes used
+        const closeIcons = Array.from(document.querySelectorAll('.icon_close, .icon_cross'));
 
-    if (couponHeader) {
-        const buttons = Array.from(couponHeader.querySelectorAll('button'));
-        // Prioritize buttons that look like "More options"
-        let menuBtn = buttons.find(b =>
-            /więcej|more|opcje|options/i.test(b.ariaLabel || "") ||
-            /dots|kebab/i.test(b.innerHTML) ||
-            b.querySelector('.icon_dots') ||
-            b.querySelector('.icon_kebab')
-        );
+        // Find the clickable button wrapper for this icon
+        const removeBtn = closeIcons
+            .map(icon => icon.closest('button'))
+            .find(btn => btn !== null && btn.offsetParent !== null); // Check visibility roughly
 
-        // Fallback to the last button in the header if no specific icon found
-        if (!menuBtn) menuBtn = buttons[buttons.length - 1];
+        if (removeBtn) {
+            console.log("Found remove button. Clicking...");
+            removeBtn.click();
 
-        if (menuBtn) {
-            console.log("Clicking menu button...", menuBtn);
-            menuBtn.click();
-            await wait(600); // Wait for menu to open
+            // Wait for UI update/animation
+            await wait(400);
+        } else {
+            console.warn("No specific remove button found, but count > 0.");
+            // Fallback: If no button found but count > 0, maybe try searching for specific text buttons or just break?
+            // Let's try to wait a bit potentially for UI to settle
+            await wait(1000);
 
-            // 2. Find "Usuń wszystkie zakłady" option
-            // Search globally as it might be in a portal
-            const removeText = "usuń wszystkie";
-            const removeOption = findByText('button, li, div[role="button"], span', removeText);
-
-            if (removeOption) {
-                console.log("Found 'Usuń wszystkie' option, clicking...", removeOption);
-                // Ensure we click the interactive element if we found a span
-                const clickable = removeOption.closest('button, li, div[role="button"]') as HTMLElement || removeOption;
-                clickable.click();
-                await wait(800); // Wait for modal
-
-                // 3. Confirm Modal
-                // Look for primary action button in a modal footer
-                const confirmBtn = document.querySelector(
-                    'button.bcl-modal-footer__btn--primary, [data-qa="modal-confirm"], button[data-test="modal-confirm-button"], .modal-footer button.primary'
-                ) as HTMLElement;
-
-                if (confirmBtn) {
-                    console.log("Confirming removal...");
-                    confirmBtn.click();
-                    await wait(1000); // Wait for action to complete
-                } else {
-                    console.warn("Confirmation button not found!");
-                }
-            } else {
-                console.log("Option 'Usuń wszystkie' not found in menu.");
+            // Re-check count, if still > 0 and no button, we might be stuck or selectors changed
+            if (getBetCount() > 0) {
+                console.error("Stuck: logic sees items but cannot find remove button.");
+                // Heuristic: maybe they are under a "read more" or similar? Unlikely for coupon items.
+                // Just continue to see if something appears, or break if consecutive fails?
+                // For now, let loop continue to max attempts.
             }
         }
     }
 
-    // Check if cleared
-    if (getBetCount() === 0) {
-        console.log("Coupon cleared via Strategy 1.");
-        return;
-    }
-
-    // --- Strategy 2: Direct "Remove All" (Bin Icon) ---
-    console.log("Strategy 1 failed/incomplete. Trying Strategy 2 (Direct Bin Icon)...");
-
-    const removeAllBtn = document.querySelector(
-        'button[aria-label="Usuń wszystko"], [data-qa="basket-remove-all"], .basket-header-action--remove, .icon_trash'
-    ) as HTMLElement;
-
-    if (removeAllBtn) {
-        console.log("Found Direct 'Remove All' button, clicking...");
-        removeAllBtn.click();
-        await wait(600);
-
-        // Confirm modal
-        const confirmBtn = document.querySelector(
-            'button.bcl-modal-footer__btn--primary, [data-qa="modal-confirm"]'
-        ) as HTMLElement;
-
-        if (confirmBtn) {
-            confirmBtn.click();
-            await wait(1000);
-        }
-
-        if (getBetCount() === 0) {
-            console.log("Coupon cleared via Strategy 2.");
-            return;
-        }
-    }
-
-    // --- Strategy 3: Iterative Delete (Fallback) ---
-    console.log("Strategies 1 & 2 failed. Falling back to Iterative Removal.");
-
-    let safetyLimit = 20;
-    while (getBetCount() > 0 && safetyLimit > 0) {
-        // Find any remove button (X icon)
-        const removeBtns = document.querySelectorAll(
-            '[data-qa="basket-item-remove"], button.basket-item-remove, .basket-item__action--remove, .icon_cross, svg.bcl-basket-item__remove-icon'
-        );
-
-        if (removeBtns.length === 0) break;
-
-        const btn = removeBtns[0] as HTMLElement;
-        const clickable = btn.closest('button') || btn;
-
-        try {
-            clickable.click();
-        } catch (e) { console.error(e); }
-
-        await wait(300); // Fast iteration
-        safetyLimit--;
-    }
-
-    if (getBetCount() === 0) {
-        console.log("Coupon cleared via Iterative Strategy.");
-    } else {
-        console.warn("Failed to fully clear coupon.");
-    }
+    return getBetCount() === 0;
 }

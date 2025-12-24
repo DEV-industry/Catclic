@@ -1,5 +1,5 @@
 import { MatchParser } from "./MatchParser"
-import { clearCoupon, isMatchValid } from "./CouponManager"
+import { clearCoupon, isMatchValid, getBetCount } from "./CouponManager"
 import { showToast, showLoadingOverlay, hideLoadingOverlay } from "./UIService"
 
 export interface AutoCouponSession {
@@ -192,14 +192,29 @@ export async function processAutoCoupon() {
     }
 
     // 2. Check status
-    if (session.current >= session.target) {
-        showToast("Kupon gotowy! Zebrano wymaganą liczbę meczy.");
+    const currentCount = getBetCount();
+    console.log(`Status Check: Session ${session.current}/${session.target}, Actual on Slip: ${currentCount}`);
+
+    // Update session current to match actual reality if possible, or trust the loop?
+    // User wants strict check: verification happens here.
+
+    if (currentCount >= session.target) {
+        if (currentCount > session.target) {
+            showToast(`Uwaga: Masz ${currentCount} meczy, a cel był ${session.target}.`);
+        } else {
+            showToast("Kupon gotowy! Zebrano wymaganą liczbę meczy.");
+        }
+
         await setSession({ ...session, active: false });
-        // DONE! Hide overlay
         hideLoadingOverlay();
     } else {
+        // We need more
+        // Use max(currentCount, session.current) to be safe? 
+        // Actually, if coupon says 2, we have 2. Update session to reflect reality
+        session.current = currentCount;
+
         console.log(`Need ${session.target - session.current} more. Navigating...`);
-        showToast(`Szukam dalej... Brakuje ${session.target - session.current}`);
+        showToast(`Szukam dalej... Mamy ${session.current}/${session.target}`);
 
         showLoadingOverlay(`Szukam kolejnych lig... Brakuje ${session.target - session.current}`);
 
@@ -216,7 +231,12 @@ export async function handleAutoCoupon(maxMatches: number, filters: { date: stri
     showLoadingOverlay("Inicjalizacja AI...");
 
     // 1. Clear existing coupon first (Only on manual trigger)
-    await clearCoupon();
+    const cleared = await clearCoupon();
+    if (!cleared) {
+        showToast("Błąd: Nie udało się wyczyścić kuponu. Spróbuj ręcznie.");
+        hideLoadingOverlay();
+        return;
+    }
 
     showLoadingOverlay("Tworzenie sesji...");
 
