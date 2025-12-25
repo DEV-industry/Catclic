@@ -12,7 +12,9 @@ export interface AutoCouponSession {
         sport: string;
     };
     liveRetryCount?: number;
-    needsClearing?: boolean; // New flag to handle clearing after reload
+    needsClearing?: boolean;
+    consecutiveEmptyVisits?: number; // New: Track consecutive useless navigations
+    addedMatches?: string[]; // Track unique match IDs
 }
 
 // --- HELPER: STORAGE ---
@@ -25,7 +27,9 @@ export const getSession = async (): Promise<AutoCouponSession> => {
         visitedUrls: [],
         filters: { isLive: false, sport: "all" },
         liveRetryCount: 0,
-        needsClearing: false
+        needsClearing: false,
+        consecutiveEmptyVisits: 0,
+        addedMatches: []
     };
 };
 
@@ -33,7 +37,8 @@ export const setSession = async (session: AutoCouponSession) => {
     await chrome.storage.local.set({ autoCouponSession: session });
 };
 
-// --- NAVIGATION HELPER ---
+// ... (Existing Navigation Helpers omitted for brevity, assuming they remain unchanged) ...
+
 function navigateToNextLeague(visited: string[], sportFilter: string) {
     // Strategy: Find sidebar or main navigation links.
     // Betclic URLs usually contain "-s" (Sport) or "-c" (Competition) ids.
@@ -97,8 +102,11 @@ function navigateToNextLeague(visited: string[], sportFilter: string) {
             current: 0,
             visitedUrls: [],
             filters: { isLive: false, sport: "all" },
-            liveRetryCount: 0
+            liveRetryCount: 0,
+            consecutiveEmptyVisits: 0,
+            addedMatches: []
         });
+        hideLoadingOverlay();
     }
 }
 
@@ -137,17 +145,49 @@ function navigateToSportCategory(sport: string) {
     }
 }
 
+
 // --- CORE LOGIC ---
 export async function processAutoCoupon() {
     const session = await getSession();
     if (!session.active) return;
+
+    // Ensure array exists
+    if (!session.addedMatches) session.addedMatches = [];
+
+    // --- FIX 1: SYNC STATE WITH REALITY ---
+    const actualCount = getBetCount();
+    if (session.current !== actualCount) {
+        console.log(`Syncing session current (${session.current}) to actual (${actualCount})`);
+        session.current = actualCount;
+        await setSession(session);
+    }
+
+    // --- FIX 2: GLOBAL SAFETY LIMIT ---
+    const MAX_PAGE_VISITS = 20; // Reduced from 30
+    if (session.visitedUrls.length > MAX_PAGE_VISITS) {
+        console.warn("Max page visits reached. Stopping.");
+        showToast(`Zatrzymano: Przeszukano zbyt wiele stron (${MAX_PAGE_VISITS}) bez rezultatu.`);
+        await setSession({ ...session, active: false });
+        hideLoadingOverlay();
+        return;
+    }
+
+    // --- FIX 3: CONSECUTIVE EMPTY VISITS ---
+    const MAX_CONSECUTIVE_EMPTY = 5;
+    if ((session.consecutiveEmptyVisits || 0) >= MAX_CONSECUTIVE_EMPTY) {
+        console.warn("Max consecutive empty visits reached. Stopping.");
+        showToast(`Nie znaleziono wystarczającej liczby meczy, aby utworzyć taki kupon.`); // Changed message per user request
+        await setSession({ ...session, active: false });
+        hideLoadingOverlay();
+        return;
+    }
 
     // Show Overlay immediately
     showLoadingOverlay(`AI analizuje mecze... ${session.current}/${session.target}`);
 
     console.log("Processing Auto Coupon Session:", session);
 
-    // -1. CLEAR COUPON IF NEEDED (Handled here to support reload-based flow)
+    // -1. CLEAR COUPON IF NEEDED
     if (session.needsClearing) {
         showLoadingOverlay("Czyszczenie kuponu...");
         const cleared = await clearCoupon();
@@ -155,14 +195,25 @@ export async function processAutoCoupon() {
             console.warn("Could not verify coupon is clear, but proceeding...");
         }
         session.needsClearing = false;
+        if (cleared) {
+            session.current = 0;
+            session.addedMatches = []; // Clear history on reset
+        }
         await setSession(session);
+    }
+
+    // 0. CHECK COMPLETION FIRST
+    if (session.current >= session.target) {
+        showToast("Kupon gotowy! Zebrano wymaganą liczbę meczy.");
+        await setSession({ ...session, active: false });
+        hideLoadingOverlay();
+        return;
     }
 
     // 0. STRICT LIVE / SPORT CHECK
     const isLive = session.filters?.isLive || false;
     const sportFilter = session.filters?.sport || "all";
 
-    // 0a. Handle Live Navigation
     // 0a. Handle Live Navigation
     if (isLive) {
         if (!window.location.href.includes("/live")) {
@@ -172,9 +223,8 @@ export async function processAutoCoupon() {
             return;
         }
 
-        // --- NEW: HANDLE LIVE SPORT FILTERS ---
+        // Handle Live Sport Filters
         if (sportFilter !== "all") {
-            // Map internal sport identifiers to UI labels found in the screenshot/DOM
             const sportLabels: Record<string, string> = {
                 "football": "Piłka nożna",
                 "basketball": "Koszykówka",
@@ -183,29 +233,26 @@ export async function processAutoCoupon() {
 
             const targetLabel = sportLabels[sportFilter];
             if (targetLabel) {
-                // Find all filter items
                 const validFilters = Array.from(document.querySelectorAll('.filters_item'));
                 const targetFilter = validFilters.find(el => el.textContent?.includes(targetLabel));
 
                 if (targetFilter) {
-                    // Check if already active
                     const isActive = targetFilter.classList.contains('isActive') || targetFilter.querySelector('.isActive');
-
                     if (!isActive) {
                         console.log(`Switching Live Sport to: ${targetLabel}`);
                         showLoadingOverlay(`Filtrowanie: ${targetLabel}...`);
                         (targetFilter as HTMLElement).click();
-
-                        // Wait for Angular/content update
                         await new Promise(r => setTimeout(r, 1000));
                     }
                 } else {
                     console.warn(`Could not find Live filter for: ${targetLabel}`);
+                    // If filter not found, sport might not be live? Stop?
+                    // For now, continue and let empty check handle it.
                 }
             }
         }
     } else {
-        // Normal Sport Check (Only if not Live, as Live has its own structure)
+        // Normal Sport Check
         if (!isCurrentPageValidForSport(sportFilter)) {
             console.log(`Current page invalid for sport '${sportFilter}'. Navigating...`);
             session.visitedUrls.push(window.location.href);
@@ -230,11 +277,14 @@ export async function processAutoCoupon() {
         const data = MatchParser.parse(container);
         if (!data || !data.elementA) continue;
 
-        // Visual / Action
-        // Check if already selected to simply skip?
-        // Betclic usually adds 'is-selected' or similar. 
+        // Check Unique ID
+        if (session.addedMatches && session.addedMatches.includes(data.id)) {
+            console.log(`Match ${data.id} already added in this session. Skipping.`);
+            continue;
+        }
+
         if (data.elementA.classList.contains('is-selected') || data.elementA.classList.contains('selected')) {
-            console.log("Match already selected, skipping...");
+            console.log("Match visually selected, skipping...");
             continue;
         }
 
@@ -246,13 +296,14 @@ export async function processAutoCoupon() {
         el.style.backgroundColor = "#4ade80";
         setTimeout(() => { if (el) el.style.backgroundColor = originalBg; }, 500);
 
+        // Add to history
+        session.addedMatches.push(data.id);
         session.current++;
         addedOnPage++;
 
-        // Reset retry count on success
         if (session.liveRetryCount && session.liveRetryCount > 0) {
             session.liveRetryCount = 0;
-            setSession(session);
+            // setSession below covers this
         }
 
         // Update overlay
@@ -261,16 +312,21 @@ export async function processAutoCoupon() {
         await new Promise(r => setTimeout(r, 400));
     }
 
+    // Update consecutive empty logic
     if (addedOnPage > 0) {
+        session.consecutiveEmptyVisits = 0;
         showToast(`Dodano ${addedOnPage} meczy. Razem: ${session.current}/${session.target}`);
+        await setSession(session);
+    } else {
+        // If we didn't add anything, this was an empty visit
+        session.consecutiveEmptyVisits = (session.consecutiveEmptyVisits || 0) + 1;
+        console.log(`Empty page visit. Consecutive: ${session.consecutiveEmptyVisits}`);
+        await setSession(session);
     }
 
     // 2. Check status
     const currentCount = getBetCount();
     console.log(`Status Check: Session ${session.current}/${session.target}, Actual on Slip: ${currentCount}`);
-
-    // Update session current to match actual reality if possible, or trust the loop?
-    // User wants strict check: verification happens here.
 
     if (currentCount >= session.target) {
         if (currentCount > session.target) {
@@ -286,13 +342,10 @@ export async function processAutoCoupon() {
         console.log(`Need ${session.target - session.current} more. Taking action...`);
 
         if (session.filters.isLive) {
-            // LIVE MODE STRATEGY:
-
-            // Check if we are stuck
+            // Live Mode
             if (addedOnPage === 0) {
                 const retries = session.liveRetryCount || 0;
                 if (retries >= 3) {
-                    // STOP
                     console.log("Live mode: Max retries reached. Stopping.");
                     showToast("Nie znaleziono wystarczającej liczby meczy dla spełnienia kryteriów.");
                     await setSession({ ...session, active: false, liveRetryCount: 0 });
@@ -303,25 +356,21 @@ export async function processAutoCoupon() {
                 console.log(`No new live matches found. Retry ${retries + 1}/3...`);
                 showLoadingOverlay(`Szukam więcej meczów... (Próba ${retries + 1}/3)`);
 
-                // Increment retry count
                 session.liveRetryCount = retries + 1;
                 await setSession(session);
 
-                // Scroll
                 window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
                 await new Promise(r => setTimeout(r, 2000));
             } else {
-                // We added something, so we are making progress. Reset retries implicitly (handled in loop or here)
                 session.liveRetryCount = 0;
                 await setSession(session);
             }
 
-            // Proceed to next iteration
             setTimeout(processAutoCoupon, 1000);
             return;
         }
 
-        // PRE-MATCH STRATEGY:
+        // PM logic
         showToast(`Szukam dalej... Mamy ${session.current}/${session.target}`);
         showLoadingOverlay(`Szukam kolejnych lig... Brakuje ${session.target - session.current}`);
 
@@ -332,25 +381,22 @@ export async function processAutoCoupon() {
     }
 }
 
-// --- TRIGGER ---
 export async function handleAutoCoupon(maxMatches: number, filters: { isLive: boolean, sport: string } = { isLive: false, sport: "all" }) {
-    // 0. Show Overlay
     showLoadingOverlay("Inicjalizacja AI... Resetowanie widoku.");
 
-    // 1. Prepare Session with NEEDS_CLEARING flag
     const session: AutoCouponSession = {
         active: true,
         target: maxMatches,
         current: 0,
-        visitedUrls: [], // Reset visited
+        visitedUrls: [],
         filters: filters,
         liveRetryCount: 0,
-        needsClearing: true // Flag to clear coupon after reload
+        needsClearing: true,
+        consecutiveEmptyVisits: 0
     };
 
     await setSession(session);
 
-    // 2. FORCE NAVIGATION TO HOME PAGE (Reset bug prevention)
     console.log("Forcing navigation to Home Page...");
     window.location.href = "https://www.betclic.pl/";
 }

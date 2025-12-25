@@ -66,7 +66,7 @@ export class MatchParser {
                 oddsB,
                 elementA: elemA,
                 elementB: elemB,
-                id: `match-${oddsA}-${oddsB}` // Note: Ideally should use team names in ID too if stable
+                id: `match-${teamA.replace(/\s/g, '')}-${teamB.replace(/\s/g, '')}`
             };
         }
 
