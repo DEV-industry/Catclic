@@ -78,7 +78,8 @@ export class MatchParser {
     static findPossibleMatchContainers(root: Document | HTMLElement = document): HTMLElement[] {
         // Strategy 1: Look for specific Betclic Event Cards (Top Level Only)
         // We avoid selecting child containers (like markets) to prevent double-injection
-        const specificCards = Array.from(root.querySelectorAll('app-sports-events-event, .cardEvent'));
+        // LIVE: Often <app-live-event-row> or <div class="eventCard">
+        const specificCards = Array.from(root.querySelectorAll('app-sports-events-event, .cardEvent, app-live-event-row, div[class*="eventCard"], div[class*="event-card"]'));
 
         if (specificCards.length > 0) {
             return specificCards as HTMLElement[];
@@ -89,10 +90,13 @@ export class MatchParser {
         const allDivs = Array.from(root.querySelectorAll('div, a, li')) as HTMLElement[];
         return allDivs.filter(div => {
             if (div.children.length > 50) return false;
+            // Relaxed text length for live which might have less info
             if (div.innerText.length > 500) return false;
 
             // Exclude common sidebar classes
             if (div.className.includes('coupon') || div.className.includes('basket') || div.className.includes('summary')) return false;
+            // Exclude filters
+            if (div.className.includes('filters')) return false;
 
             const text = div.innerText;
             // Check for at least 2 pattern matches of odds (e.g. 1.50 or 1,50)

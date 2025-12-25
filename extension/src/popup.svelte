@@ -5,7 +5,7 @@
 
     let activeTab = "home"; // home, settings
     let matchCount = 3;
-    let dateFilter = "today"; // today, tomorrow, all
+    let isLive = false;
     let sportFilter = "all"; // all, football, tennis, basketball
     let showFilters = false;
 
@@ -17,7 +17,7 @@
                     action: "ACTION_SKLEJ_KUPON",
                     count: matchCount,
                     filters: {
-                        date: dateFilter,
+                        isLive: isLive,
                         sport: sportFilter,
                     },
                 });
@@ -104,21 +104,29 @@
                     transition:scale={{ duration: 200, start: 0.95 }}
                 >
                     <div
-                        class="bg-white p-3 rounded-lg shadow-sm border border-[#e5e7eb]"
+                        class="bg-white p-3 rounded-lg shadow-sm border border-[#e5e7eb] flex flex-col justify-center"
                     >
-                        <label
+                        <span
                             class="text-[10px] text-[#6b7280] font-bold uppercase tracking-wider block mb-2"
-                            for="dateFilter">Data</label
+                            >Tryb</span
                         >
-                        <select
-                            id="dateFilter"
-                            bind:value={dateFilter}
-                            class="w-full text-sm bg-transparent border-none outline-none font-medium text-[#0d1620] cursor-pointer"
+                        <button
+                            on:click={() => (isLive = !isLive)}
+                            class={`w-full text-sm font-bold py-1.5 px-3 rounded transition-all flex items-center justify-between border ${
+                                isLive
+                                    ? "bg-red-50 text-[#d50032] border-[#d50032]"
+                                    : "bg-gray-50 text-[#6b7280] border-transparent hover:bg-gray-100"
+                            }`}
                         >
-                            <option value="today">Dzisiaj</option>
-                            <option value="tomorrow">Jutro</option>
-                            <option value="all">Wszystkie</option>
-                        </select>
+                            <span>Na żywo</span>
+                            <div
+                                class={`w-3 h-3 rounded-full shadow-sm transition-colors ${
+                                    isLive
+                                        ? "bg-[#d50032] animate-pulse"
+                                        : "bg-gray-300"
+                                }`}
+                            ></div>
+                        </button>
                     </div>
                     <div
                         class="bg-white p-3 rounded-lg shadow-sm border border-[#e5e7eb]"

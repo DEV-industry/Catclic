@@ -1,44 +1,38 @@
 
-// --- HELPER: CHECK IF MATCH IS VALID (Date Filter) ---
-export function isMatchValid(element: HTMLElement, dateFilter: string): boolean {
+// --- HELPER: CHECK IF MATCH IS VALID (isLive Filter) ---
+export function isMatchValid(element: HTMLElement, isLive: boolean): boolean {
     const text = element.innerText.toLowerCase();
 
-    // 1. Filter: TODAY
-    if (dateFilter === "today") {
+    // 1. LIVE MODE
+    if (isLive) {
+        // If explicitly "Jutro" or "Pojutrze", definitely not live
         if (text.includes("jutro") || text.includes("pojutrze")) return false;
-        if (text.includes("dzisiaj")) return true;
 
-        // Strict date check for today
-        const today = new Date();
-        const d = String(today.getDate()).padStart(2, '0');
-        const m = String(today.getMonth() + 1).padStart(2, '0');
-        const todayStr = `${d}.${m}`;
-        const todayStrSlash = `${d}/${m}`;
-
-        const dateMatches = text.match(/\d{1,2}[./]\d{2}/g);
-        if (dateMatches) {
-            // If date found is NOT today, return false
-            return !dateMatches.some(date => date !== todayStr && date !== todayStrSlash);
-        }
-        return true; // Default to true if only time is shown
+        // TRUST: If we are in Live mode (Auto Coupon triggered it), and we are on the Live Page,
+        // we can assume the matches found are correctly filtered by the site.
+        // The regex checks were too strict for some sports (e.g. Basketball "Q1").
+        // We still check for "Jutro" to avoid "Suggested" widgets, but otherwise we permit it.
+        return true;
     }
 
-    // 2. Filter: TOMORROW
-    if (dateFilter === "tomorrow") {
-        if (text.includes("jutro")) return true;
+    // 2. STANDARD MODE (Default: Today)
+    // Falls back to "Today" logic if not Live mode
+    if (text.includes("jutro") || text.includes("pojutrze")) return false;
+    if (text.includes("dzisiaj")) return true;
 
-        const tomorrow = new Date();
-        tomorrow.setDate(tomorrow.getDate() + 1);
-        const d = String(tomorrow.getDate()).padStart(2, '0');
-        const m = String(tomorrow.getMonth() + 1).padStart(2, '0');
-        const tomStr = `${d}.${m}`;
-        const tomStrSlash = `${d}/${m}`;
+    // Strict date check for today
+    const today = new Date();
+    const d = String(today.getDate()).padStart(2, '0');
+    const m = String(today.getMonth() + 1).padStart(2, '0');
+    const todayStr = `${d}.${m}`;
+    const todayStrSlash = `${d}/${m}`;
 
-        return text.includes(tomStr) || text.includes(tomStrSlash);
+    const dateMatches = text.match(/\d{1,2}[./]\d{2}/g);
+    if (dateMatches) {
+        // If date found is NOT today, return false
+        return !dateMatches.some(date => date !== todayStr && date !== todayStrSlash);
     }
-
-    // 3. Filter: ALL
-    return true;
+    return true; // Default to true if only time is shown (implies today)
 }
 
 const wait = (ms: number) => new Promise(r => setTimeout(r, ms));

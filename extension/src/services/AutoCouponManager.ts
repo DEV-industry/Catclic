@@ -8,9 +8,11 @@ export interface AutoCouponSession {
     current: number;
     visitedUrls: string[];
     filters: {
-        date: string;
+        isLive: boolean;
         sport: string;
     };
+    liveRetryCount?: number;
+    needsClearing?: boolean; // New flag to handle clearing after reload
 }
 
 // --- HELPER: STORAGE ---
@@ -21,7 +23,9 @@ export const getSession = async (): Promise<AutoCouponSession> => {
         target: 0,
         current: 0,
         visitedUrls: [],
-        filters: { date: "today", sport: "all" }
+        filters: { isLive: false, sport: "all" },
+        liveRetryCount: 0,
+        needsClearing: false
     };
 };
 
@@ -92,7 +96,8 @@ function navigateToNextLeague(visited: string[], sportFilter: string) {
             target: 0,
             current: 0,
             visitedUrls: [],
-            filters: { date: "today", sport: "all" }
+            filters: { isLive: false, sport: "all" },
+            liveRetryCount: 0
         });
     }
 }
@@ -142,17 +147,73 @@ export async function processAutoCoupon() {
 
     console.log("Processing Auto Coupon Session:", session);
 
-    // 0. STRICT SPORT CHECK
-    const sportFilter = session.filters?.sport || "all";
-    if (!isCurrentPageValidForSport(sportFilter)) {
-        console.log(`Current page invalid for sport '${sportFilter}'. Navigating...`);
-        session.visitedUrls.push(window.location.href);
+    // -1. CLEAR COUPON IF NEEDED (Handled here to support reload-based flow)
+    if (session.needsClearing) {
+        showLoadingOverlay("Czyszczenie kuponu...");
+        const cleared = await clearCoupon();
+        if (!cleared) {
+            console.warn("Could not verify coupon is clear, but proceeding...");
+        }
+        session.needsClearing = false;
+        await setSession(session);
+    }
 
-        showLoadingOverlay(`Przechodzenie do kategorii: ${sportFilter}...`);
-        navigateToSportCategory(sportFilter);
-        // Note: verify if we need to hide overlay? Navigation usually clears page, but overlay might persist if SPA. 
-        // Betclic seems to be MPA/SPA hybrid. Let's keep overlay until unload.
-        return;
+    // 0. STRICT LIVE / SPORT CHECK
+    const isLive = session.filters?.isLive || false;
+    const sportFilter = session.filters?.sport || "all";
+
+    // 0a. Handle Live Navigation
+    // 0a. Handle Live Navigation
+    if (isLive) {
+        if (!window.location.href.includes("/live")) {
+            console.log("Live mode active. Navigating to Live section...");
+            showLoadingOverlay("Przechodzenie do sekcji Na Żywo...");
+            window.location.href = "https://www.betclic.pl/live";
+            return;
+        }
+
+        // --- NEW: HANDLE LIVE SPORT FILTERS ---
+        if (sportFilter !== "all") {
+            // Map internal sport identifiers to UI labels found in the screenshot/DOM
+            const sportLabels: Record<string, string> = {
+                "football": "Piłka nożna",
+                "basketball": "Koszykówka",
+                "tennis": "Tenis"
+            };
+
+            const targetLabel = sportLabels[sportFilter];
+            if (targetLabel) {
+                // Find all filter items
+                const validFilters = Array.from(document.querySelectorAll('.filters_item'));
+                const targetFilter = validFilters.find(el => el.textContent?.includes(targetLabel));
+
+                if (targetFilter) {
+                    // Check if already active
+                    const isActive = targetFilter.classList.contains('isActive') || targetFilter.querySelector('.isActive');
+
+                    if (!isActive) {
+                        console.log(`Switching Live Sport to: ${targetLabel}`);
+                        showLoadingOverlay(`Filtrowanie: ${targetLabel}...`);
+                        (targetFilter as HTMLElement).click();
+
+                        // Wait for Angular/content update
+                        await new Promise(r => setTimeout(r, 1000));
+                    }
+                } else {
+                    console.warn(`Could not find Live filter for: ${targetLabel}`);
+                }
+            }
+        }
+    } else {
+        // Normal Sport Check (Only if not Live, as Live has its own structure)
+        if (!isCurrentPageValidForSport(sportFilter)) {
+            console.log(`Current page invalid for sport '${sportFilter}'. Navigating...`);
+            session.visitedUrls.push(window.location.href);
+
+            showLoadingOverlay(`Przechodzenie do kategorii: ${sportFilter}...`);
+            navigateToSportCategory(sportFilter);
+            return;
+        }
     }
 
     // 1. Find matches on current page
@@ -163,13 +224,20 @@ export async function processAutoCoupon() {
     for (const container of containers) {
         if (session.current >= session.target) break;
 
-        const dateFilter = session.filters?.date || "today";
-        if (!isMatchValid(container, dateFilter)) continue;
+        const isLive = session.filters?.isLive || false;
+        if (!isMatchValid(container, isLive)) continue;
 
         const data = MatchParser.parse(container);
         if (!data || !data.elementA) continue;
 
         // Visual / Action
+        // Check if already selected to simply skip?
+        // Betclic usually adds 'is-selected' or similar. 
+        if (data.elementA.classList.contains('is-selected') || data.elementA.classList.contains('selected')) {
+            console.log("Match already selected, skipping...");
+            continue;
+        }
+
         data.elementA.scrollIntoView({ behavior: 'smooth', block: 'center' });
         data.elementA.click();
 
@@ -180,6 +248,12 @@ export async function processAutoCoupon() {
 
         session.current++;
         addedOnPage++;
+
+        // Reset retry count on success
+        if (session.liveRetryCount && session.liveRetryCount > 0) {
+            session.liveRetryCount = 0;
+            setSession(session);
+        }
 
         // Update overlay
         showLoadingOverlay(`Dodano mecz: ${data.teamA} vs ${data.teamB} (${session.current}/${session.target})`);
@@ -209,13 +283,46 @@ export async function processAutoCoupon() {
         hideLoadingOverlay();
     } else {
         // We need more
-        // Use max(currentCount, session.current) to be safe? 
-        // Actually, if coupon says 2, we have 2. Update session to reflect reality
-        session.current = currentCount;
+        console.log(`Need ${session.target - session.current} more. Taking action...`);
 
-        console.log(`Need ${session.target - session.current} more. Navigating...`);
+        if (session.filters.isLive) {
+            // LIVE MODE STRATEGY:
+
+            // Check if we are stuck
+            if (addedOnPage === 0) {
+                const retries = session.liveRetryCount || 0;
+                if (retries >= 3) {
+                    // STOP
+                    console.log("Live mode: Max retries reached. Stopping.");
+                    showToast("Nie znaleziono wystarczającej liczby meczy dla spełnienia kryteriów.");
+                    await setSession({ ...session, active: false, liveRetryCount: 0 });
+                    hideLoadingOverlay();
+                    return;
+                }
+
+                console.log(`No new live matches found. Retry ${retries + 1}/3...`);
+                showLoadingOverlay(`Szukam więcej meczów... (Próba ${retries + 1}/3)`);
+
+                // Increment retry count
+                session.liveRetryCount = retries + 1;
+                await setSession(session);
+
+                // Scroll
+                window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+                await new Promise(r => setTimeout(r, 2000));
+            } else {
+                // We added something, so we are making progress. Reset retries implicitly (handled in loop or here)
+                session.liveRetryCount = 0;
+                await setSession(session);
+            }
+
+            // Proceed to next iteration
+            setTimeout(processAutoCoupon, 1000);
+            return;
+        }
+
+        // PRE-MATCH STRATEGY:
         showToast(`Szukam dalej... Mamy ${session.current}/${session.target}`);
-
         showLoadingOverlay(`Szukam kolejnych lig... Brakuje ${session.target - session.current}`);
 
         session.visitedUrls.push(window.location.href);
@@ -226,37 +333,24 @@ export async function processAutoCoupon() {
 }
 
 // --- TRIGGER ---
-export async function handleAutoCoupon(maxMatches: number, filters: { date: string, sport: string } = { date: "today", sport: "all" }) {
+export async function handleAutoCoupon(maxMatches: number, filters: { isLive: boolean, sport: string } = { isLive: false, sport: "all" }) {
     // 0. Show Overlay
-    showLoadingOverlay("Inicjalizacja AI...");
+    showLoadingOverlay("Inicjalizacja AI... Resetowanie widoku.");
 
-    // 1. Clear existing coupon first (Only on manual trigger)
-    const cleared = await clearCoupon();
-    if (!cleared) {
-        showToast("Błąd: Nie udało się wyczyścić kuponu. Spróbuj ręcznie.");
-        hideLoadingOverlay();
-        return;
-    }
-
-    showLoadingOverlay("Tworzenie sesji...");
-
-    // 2. Start Session
+    // 1. Prepare Session with NEEDS_CLEARING flag
     const session: AutoCouponSession = {
         active: true,
         target: maxMatches,
         current: 0,
-        visitedUrls: [window.location.href],
-        filters: filters
+        visitedUrls: [], // Reset visited
+        filters: filters,
+        liveRetryCount: 0,
+        needsClearing: true // Flag to clear coupon after reload
     };
+
     await setSession(session);
 
-    // 3. CHECK SPORT LOCATION IMMEDIATELY
-    if (!isCurrentPageValidForSport(filters.sport)) {
-        showLoadingOverlay(`Przekierowanie do: ${filters.sport}`);
-        navigateToSportCategory(filters.sport);
-        return;
-    }
-
-    // 4. Process current page immediately if valid
-    processAutoCoupon();
+    // 2. FORCE NAVIGATION TO HOME PAGE (Reset bug prevention)
+    console.log("Forcing navigation to Home Page...");
+    window.location.href = "https://www.betclic.pl/";
 }
