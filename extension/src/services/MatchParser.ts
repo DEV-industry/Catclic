@@ -81,31 +81,24 @@ export class MatchParser {
 
     static findPossibleMatchContainers(root: Document | HTMLElement = document): HTMLElement[] {
         // Strategy 1: Look for specific Betclic Event Cards (Top Level Only)
-        const specificCards = Array.from(root.querySelectorAll('app-sports-events-event, .cardEvent, app-live-event-row, div[class*="eventCard"], div[class*="event-card"]'));
+        const selectors = [
+            'app-sports-events-event',
+            '.cardEvent',
+            'app-live-event-row',
+            'div[class*="eventCard"]',
+            'div[class*="event-card"]',
+            'app-event',
+            'app-article-match'
+        ];
 
-        if (specificCards.length > 0) {
-            return (specificCards as HTMLElement[]).filter(card => !this.isInsideCoupon(card));
-        }
+        const specificCards = Array.from(root.querySelectorAll(selectors.join(', ')));
 
-        // Strategy 2: Heuristic (Backup) - Only if specific cards not found
-        // But be careful not to pick up the sidebar
-        const allDivs = Array.from(root.querySelectorAll('div, a, li')) as HTMLElement[];
-        return allDivs.filter(div => {
-            if (div.children.length > 50) return false;
-            // Relaxed text length for live which might have less info
-            if (div.innerText.length > 500) return false;
+        // Always check specific cards first and strictly filter out coupon items
+        return (specificCards as HTMLElement[]).filter(card => !this.isInsideCoupon(card));
 
-            // Exclude common sidebar classes (Direct check + Ancestry check)
-            if (div.className.includes('coupon') || div.className.includes('basket') || div.className.includes('summary')) return false;
-            if (this.isInsideCoupon(div)) return false;
-
-            // Exclude filters
-            if (div.className.includes('filters')) return false;
-
-            const text = div.innerText;
-            // Check for at least 2 pattern matches of odds (e.g. 1.50 or 1,50)
-            const decimals = text.match(/(\d+[.,]\d{2})/g);
-            return decimals && decimals.length >= 2;
-        });
+        // Strategy 2: Heuristic (Backup) - DISABLED
+        // This strategy was causing severe issues by tagging coupon items/tabs as matches.
+        // It is better to miss a match than to break the UI with spam.
+        // return [];
     }
 }
