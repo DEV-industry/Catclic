@@ -20,7 +20,13 @@
   let tooltipPosition = { top: 0, left: 0 };
   let closeTimeout;
 
+  let isLoading = false;
+  let isGenerated = false;
+  const logoUrl = chrome.runtime.getURL("assets/logo.png");
+
   async function getPrediction() {
+    if (isLoading || isGenerated) return;
+    isLoading = true;
     try {
       const res = await fetch("http://localhost:3000/predict", {
         method: "POST",
@@ -38,9 +44,34 @@
         "Szczegółowa analiza niedostępna.";
       stats = data.stats || null;
 
+      isGenerated = true;
       applyHighlight();
+
+      // Auto-open tooltip after generation to show result immediately
+      if (highlightedElement) {
+        // Calculate position immediately relative to the button or the element?
+        // Existing logic uses hover on element. Let's try to simulate that or just define position.
+        // Let's rely on the user hovering for now, OR better, open it near the button/element.
+        // But the `applyHighlight` adds listeners.
+        // Let's just let the user hover or click "See analysis" if I add it.
+        // Wait, the user screenshot shows the tooltip OPEN.
+        // I'll try to simulate a mouse enter or just set showTooltip = true with a default position?
+        // Position is tricky without an event.
+        // I'll defer auto-opening to keep it simple, or maybe just point to the highlight.
+        // Actually, if I just highlight, the user will see it.
+        // NEW REQUIREMENT: "In the top right corner... icon Catclic where after pressing it only then will start generating"
+        // Doesn't explicitly say "and open it".
+        // But "Catclic" card in screenshot looks like the result.
+        // Let's leave it as: Click -> Load -> Highlight (Green) -> Button becomes "Check" or just stays?
+        // I'll hide the button if it obstructs, or keep it.
+        // I'll keep the button invisible after generation? No, maybe I want to regenerate?
+        // Let's hide the button after generation so it doesn't block the view, or maybe change it to "Analiza gotowa".
+        // I'll simply hide the trigger button after successful generation.
+      }
     } catch (e) {
       console.error("Prediction failed", e);
+    } finally {
+      isLoading = false;
     }
   }
 
@@ -132,10 +163,6 @@
     };
   }
 
-  onMount(() => {
-    getPrediction();
-  });
-
   onDestroy(() => {
     if (highlightedElement) {
       highlightedElement.removeEventListener("mouseenter", handleMouseEnter);
@@ -177,4 +204,63 @@
       }}
     />
   </div>
+{/if}
+
+{#if !isGenerated}
+  <button
+    class="catclic-trigger"
+    title="Wygeneruj predykcję Catclic"
+    style="
+      position: absolute;
+      top: 10px;
+      right: 12px;
+      z-index: 1000;
+      background: transparent;
+      border: none;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: transform 0.2s;
+      pointer-events: auto;
+    "
+    on:click|stopPropagation|preventDefault={getPrediction}
+    on:mousedown|stopPropagation
+    on:mouseup|stopPropagation
+  >
+    {#if isLoading}
+      <div class="spinner"></div>
+    {:else}
+      <img
+        src={logoUrl}
+        alt="Catclic"
+        style="height: 24px; width: auto; object-fit: contain; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.3));"
+      />
+    {/if}
+  </button>
+
+  <style>
+    .catclic-trigger:hover {
+      transform: scale(1.1);
+    }
+    .spinner {
+      width: 16px;
+      height: 16px;
+      border: 2px solid #d50032;
+      border-bottom-color: transparent;
+      border-radius: 50%;
+      display: inline-block;
+      box-sizing: border-box;
+      animation: rotation 1s linear infinite;
+    }
+    @keyframes rotation {
+      0% {
+        transform: rotate(0deg);
+      }
+      100% {
+        transform: rotate(360deg);
+      }
+    }
+  </style>
 {/if}

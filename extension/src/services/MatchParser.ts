@@ -82,7 +82,10 @@ export class MatchParser {
         const specificCards = Array.from(root.querySelectorAll('app-sports-events-event, .cardEvent, app-live-event-row, div[class*="eventCard"], div[class*="event-card"]'));
 
         if (specificCards.length > 0) {
-            return specificCards as HTMLElement[];
+            return (specificCards as HTMLElement[]).filter(card => {
+                // Exclude if inside coupon, basket, or sidebar
+                return !card.closest('.coupon, .basket, .betslip, app-coupon, .bcl-coupon-wrapper, .sidebar, bcl-bet-summary');
+            });
         }
 
         // Strategy 2: Heuristic (Backup) - Only if specific cards not found
