@@ -212,8 +212,9 @@
     title="Wygeneruj predykcję Catclic"
     style="
       position: absolute;
-      top: 10px;
-      right: 12px;
+      top: 40px;
+      left: 12px;
+      right: auto;
       z-index: 1000;
       background: transparent;
       border: none;
@@ -235,7 +236,7 @@
       <img
         src={logoUrl}
         alt="Catclic"
-        style="height: 24px; width: auto; object-fit: contain; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.3));"
+        style="height: 18px; width: auto; object-fit: contain; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.8));"
       />
     {/if}
   </button>

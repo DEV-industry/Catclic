@@ -50,10 +50,11 @@ export class GeminiService {
           
           Instructions:
           1. Act as a sports betting expert.
-          2. Estimate win probabilities based on the odds provided and general team knowledge.
-          3. IMPORTANT: Keep the analysis SHORT - maximum 2-3 sentences. Be concise!
-          4. Do NOT hallucinate specific match stats. Focus on key team strengths/weaknesses.
-          5. Generate radar chart data (0-100 scale) for both teams comparing: Attack, Defense, Form, H2H record, Ball Possession.
+          2. Estimate win probabilities based on general team knowledge ONLY.
+          3. CRITICAL: Do NOT use the odds provided to justify your prediction or analysis. Ignore the odds values for your reasoning.
+          4. IMPORTANT: Keep the analysis SHORT - maximum 2-3 sentences. Be concise!
+          5. Do NOT hallucinate specific match stats. Focus on key team strengths/weaknesses.
+          6. Generate radar chart data (0-100 scale) for both teams comparing: Attack, Defense, Form, H2H record, Ball Possession.
 
           Return strictly JSON: 
           {

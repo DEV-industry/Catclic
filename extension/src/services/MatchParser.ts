@@ -75,17 +75,16 @@ export class MatchParser {
         return null;
     }
 
+    private static isInsideCoupon(element: HTMLElement): boolean {
+        return !!element.closest('.coupon, .basket, .betslip, app-coupon, .bcl-coupon-wrapper, .sidebar, bcl-bet-summary, .right-column, .layout-sidebar-right, aside, .flyout');
+    }
+
     static findPossibleMatchContainers(root: Document | HTMLElement = document): HTMLElement[] {
         // Strategy 1: Look for specific Betclic Event Cards (Top Level Only)
-        // We avoid selecting child containers (like markets) to prevent double-injection
-        // LIVE: Often <app-live-event-row> or <div class="eventCard">
         const specificCards = Array.from(root.querySelectorAll('app-sports-events-event, .cardEvent, app-live-event-row, div[class*="eventCard"], div[class*="event-card"]'));
 
         if (specificCards.length > 0) {
-            return (specificCards as HTMLElement[]).filter(card => {
-                // Exclude if inside coupon, basket, or sidebar
-                return !card.closest('.coupon, .basket, .betslip, app-coupon, .bcl-coupon-wrapper, .sidebar, bcl-bet-summary');
-            });
+            return (specificCards as HTMLElement[]).filter(card => !this.isInsideCoupon(card));
         }
 
         // Strategy 2: Heuristic (Backup) - Only if specific cards not found
@@ -96,8 +95,10 @@ export class MatchParser {
             // Relaxed text length for live which might have less info
             if (div.innerText.length > 500) return false;
 
-            // Exclude common sidebar classes
+            // Exclude common sidebar classes (Direct check + Ancestry check)
             if (div.className.includes('coupon') || div.className.includes('basket') || div.className.includes('summary')) return false;
+            if (this.isInsideCoupon(div)) return false;
+
             // Exclude filters
             if (div.className.includes('filters')) return false;
 
