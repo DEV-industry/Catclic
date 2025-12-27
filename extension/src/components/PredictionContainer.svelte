@@ -210,22 +210,6 @@
   <button
     class="catclic-trigger"
     title="Wygeneruj predykcję Catclic"
-    style="
-      position: absolute;
-      top: 40px;
-      left: 12px;
-      right: auto;
-      z-index: 1000;
-      background: transparent;
-      border: none;
-      padding: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      transition: transform 0.2s;
-      pointer-events: auto;
-    "
     on:click|stopPropagation|preventDefault={getPrediction}
     on:mousedown|stopPropagation
     on:mouseup|stopPropagation
@@ -242,8 +226,25 @@
   </button>
 
   <style>
+    .catclic-trigger {
+      position: absolute;
+      top: -20px;
+      bottom: auto;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 1000;
+      background: transparent;
+      border: none;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      pointer-events: auto;
+      transition: transform 0.2s;
+    }
     .catclic-trigger:hover {
-      transform: scale(1.1);
+      transform: translateX(-50%) scale(1.1);
     }
     .spinner {
       width: 16px;
