@@ -8,6 +8,7 @@
     let isLive = false;
     let sportFilter = "all"; // all, football, tennis, basketball
     let maxOdds = 2.5;
+    let enableAdvancedStats = false;
     let showFilters = false;
 
     let isValidDomain = false;
@@ -37,6 +38,7 @@
                         isLive: isLive,
                         sport: sportFilter,
                         maxOdds: maxOdds,
+                        enableAdvancedStats: enableAdvancedStats,
                     },
                 });
                 window.close(); // Close popup after action
@@ -171,6 +173,32 @@
                                 <option value="basketball">Koszykówka</option>
                             </select>
                         </div>
+                    </div>
+                {/if}
+
+                {#if showFilters && (sportFilter === "football" || sportFilter === "all")}
+                    <div
+                        transition:scale={{ duration: 200 }}
+                        class="bg-white p-3 rounded-lg shadow-sm border border-[#e5e7eb] flex items-center justify-between"
+                    >
+                        <div class="flex flex-col">
+                            <span
+                                class="text-[10px] text-[#6b7280] font-bold uppercase tracking-wider mb-1"
+                                >Eksperymentalne</span
+                            >
+                            <span class="text-xs font-bold text-[#0d1620]"
+                                >Zaawansowane Statystyki (AI)</span
+                            >
+                        </div>
+                        <button
+                            on:click={() =>
+                                (enableAdvancedStats = !enableAdvancedStats)}
+                            class={`relative w-11 h-6 transition-colors rounded-full ${enableAdvancedStats ? "bg-[#d50032]" : "bg-gray-200"}`}
+                        >
+                            <span
+                                class={`absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${enableAdvancedStats ? "translate-x-5" : "translate-x-0"}`}
+                            ></span>
+                        </button>
                     </div>
                 {/if}
 

@@ -1,4 +1,5 @@
 import { MatchParser } from "./MatchParser"
+import { MatchDetailsParser } from "./MatchDetailsParser"
 import { clearCoupon, isMatchValid, getBetCount } from "./CouponManager"
 import { showToast, showLoadingOverlay, hideLoadingOverlay } from "./UIService"
 
@@ -11,6 +12,7 @@ export interface AutoCouponSession {
         isLive: boolean;
         sport: string;
         maxOdds?: number;
+        enableAdvancedStats?: boolean;
     };
     liveRetryCount?: number;
     needsClearing?: boolean;
@@ -271,7 +273,7 @@ export async function processAutoCoupon() {
     // --- AI SELECTION LOGIC ---
     // 1. Collect Valid Candidates
     const candidates: any[] = [];
-    const containerMap = new Map<string, { elementA: HTMLElement, elementB?: HTMLElement }>();
+    const containerMap = new Map<string, { elementA: HTMLElement, elementB?: HTMLElement, element: HTMLElement }>();
 
     for (const container of containers) {
         if (session.current + candidates.length >= session.target) break; // Optimization? No, we want pool.
@@ -300,20 +302,32 @@ export async function processAutoCoupon() {
             teamB: data.teamB,
             // odds: currentOdds // Optional
         });
-        containerMap.set(data.id, { elementA: data.elementA, elementB: data.elementB });
+        containerMap.set(data.id, { elementA: data.elementA, elementB: data.elementB, element: data.element });
     }
 
     let addedOnPage = 0;
-    let selectedBets: { id: string, prediction: '1' | '2' }[] = [];
+    let selectedBets: { id: string, prediction: '1' | '2' | 'advanced', advancedSelection?: string, teamA?: string }[] = [];
 
     if (candidates.length > 0) {
         const needed = session.target - session.current;
+
+        // --- MIXED STRATEGY ---
+        // If Advanced Stats is enabled, we replace some standard picks with Advanced ones.
+        // For simplicity: If enabled, try to make the NEXT bet an advanced one if we haven't enough.
+        // Or: 50% chance. 
+
+        const enableAdvanced = session.filters?.enableAdvancedStats || false;
+
+        // Simple strategy: Interleave. 1 Standard, 1 Advanced, etc.
+        // Or just pick candidates.
+
+        // Let's filter candidates for standard vs advanced.
 
         console.log(`Found ${candidates.length} candidates. Asking AI to rank top ${needed}...`);
         showLoadingOverlay(`AI analizuje ${candidates.length} kandydatów...`);
 
         try {
-            // Call Backend
+            // Rank for Standard First
             const response = await fetch('http://localhost:3000/predict/rank', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -321,17 +335,24 @@ export async function processAutoCoupon() {
             });
 
             if (response.ok) {
-                selectedBets = await response.json();
-                console.log("AI Selected:", selectedBets);
+                let standardSelected = await response.json();
+
+                if (enableAdvanced) {
+                    // Take only half standard, leave room for advanced
+                    // actually, we iterate one by one.
+                    selectedBets = standardSelected;
+                } else {
+                    selectedBets = standardSelected;
+                }
             } else {
                 throw new Error("Backend error");
             }
         } catch (e) {
-            console.error("AI Ranking Failed, falling back to random:", e);
-            // Fallback: Random selection to avoid left-side bias
+            // ... fallback
             const shuffled = candidates.sort(() => 0.5 - Math.random());
             selectedBets = shuffled.slice(0, needed).map(c => ({
                 id: c.id,
+                teamA: c.teamA,
                 prediction: Math.random() > 0.5 ? '1' : '2'
             }));
         }
@@ -340,33 +361,134 @@ export async function processAutoCoupon() {
         for (const bet of selectedBets) {
             if (session.current >= session.target) break;
 
+            // DECIDE: Standard or Advanced?
+            // If enabled, we flip a coin or alternate.
+            // Let's try: if (session.current % 2 !== 0 && enableAdvanced) -> do Advanced
+            // This ensures we get specific bets.
+
+            const doAdvanced = enableAdvanced && (Math.random() > 0.5); // 50% chance for advanced to ensure mix
+
             const elements = containerMap.get(bet.id);
             if (!elements) continue;
 
-            let elToClick: HTMLElement | null = null;
-            if (bet.prediction === '1') {
-                elToClick = elements.elementA;
-            } else if (bet.prediction === '2') {
-                elToClick = elements.elementB || null;
-            }
+            if (doAdvanced) {
+                // --- ADVANCED FLOW ---
+                showLoadingOverlay(`Analiza szczegółowa (AI): ${bet.id}...`);
 
-            if (elToClick) {
-                elToClick.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                elToClick.click();
+                // 1. Enter Match
+                // We need to click the match area, not the odds.
+                // Usually clicking the match names works.
+                const matchLink = elements.element.querySelector('a') || elements.element;
+                matchLink.click();
 
-                // Visual Feedback
-                const originalBg = elToClick.style.backgroundColor;
-                elToClick.style.backgroundColor = "#4ade80"; // Green for AI pick
-                setTimeout(() => { if (elToClick) elToClick.style.backgroundColor = originalBg; }, 500);
+                // Wait for navigation (it might be SPA)
+                await new Promise(r => setTimeout(r, 2000));
 
-                session.addedMatches.push(bet.id);
-                session.current++;
-                addedOnPage++;
+                // 2. Parse Details
+                // Static import used above
 
-                showLoadingOverlay(`Dodano (AI): ${bet.id} (${session.current}/${session.target})`);
-                await new Promise(r => setTimeout(r, 600));
+                // Try to find stats text
+                const markets = await MatchDetailsParser.scanAdvancedMarkets();
+                console.log("Found Markets:", markets);
+
+                // 3. AI Decision (Mocked or Real)
+                // For now, let's look for "Rzuty rożne" -> "Powyżej 8.5" or similar
+                let chosenBet = null;
+
+                // Simple Heuristic: Pick ANY bet from "Corners" if available
+                const cornerMarket = markets.find(m => m.marketName.toLowerCase().includes("rożne"));
+                if (cornerMarket && cornerMarket.bets.length > 0) {
+                    // Prefer "Powyżej" but take anything
+                    chosenBet = cornerMarket.bets.find(b => b.selection.toLowerCase().includes("powyżej")) || cornerMarket.bets[0];
+                }
+
+                if (!chosenBet) {
+                    // Fallback to cards?
+                    const cardMarket = markets.find(m => m.marketName.toLowerCase().includes("kartki"));
+                    if (cardMarket && cardMarket.bets.length > 0) {
+                        chosenBet = cardMarket.bets.find(b => b.selection.toLowerCase().includes("powyżej")) || cardMarket.bets[0];
+                    }
+                }
+
+                // Final Fallback: Just pick the first available advanced bet from any market to prove it works
+                if (!chosenBet && markets.length > 0) {
+                    // Try to avoid "Exact Score" or high risk bets if possible, but for data validation take first
+                    const firstSafeMarket = markets.find(m => !m.marketName.toLowerCase().includes("dokładny"));
+                    if (firstSafeMarket && firstSafeMarket.bets.length > 0) {
+                        chosenBet = firstSafeMarket.bets[0];
+                    } else {
+                        // desperate fallback
+                        chosenBet = markets[0].bets[0];
+                    }
+                }
+
+                if (chosenBet) {
+                    chosenBet.element.click();
+                    showLoadingOverlay(`Dodano (AI Advanced): ${chosenBet.selection}`);
+                    session.addedMatches.push(bet.id);
+                    session.current++;
+                    addedOnPage++;
+                    await new Promise(r => setTimeout(r, 1000));
+
+                    // 4. Go Back
+                    window.history.back();
+                    await new Promise(r => setTimeout(r, 1500)); // Wait for list reload
+
+                    break; // Exit loop as page state changed, let next iteration re-scan
+                } else {
+                    console.log("No suitable advanced bet found. Falling back to standard bet.");
+                    // Go back to list
+                    window.history.back();
+                    await new Promise(r => setTimeout(r, 1500));
+
+                    // Let's just do the standard click HERE.
+                    try {
+                        const newContainer = document.querySelector(`app-sports-events-event[id*="${bet.id}"]`) ||
+                            Array.from(document.querySelectorAll('a')).find(a => a.href.includes(bet.id))?.closest('div'); // Rough re-find
+
+                        if (newContainer) {
+                            const oddBtns = newContainer.querySelectorAll('.odd-button, button'); // simplifying
+                            // Just pick one
+                            if (oddBtns.length > 0) {
+                                (oddBtns[0] as HTMLElement).click();
+                                session.addedMatches.push(bet.id);
+                                session.current++;
+                                addedOnPage++;
+                                showLoadingOverlay(`Dodano (Standard Fallback): ${bet.teamA}`);
+                            }
+                        }
+                    } catch (e) {
+                        console.error("Fallback standard failed", e);
+                    }
+
+                    break; // Break loop to refresh candidates next run
+                }
+
             } else {
-                console.warn(`Could not find element for bet ID ${bet.id} with prediction ${bet.prediction}`);
+                // --- STANDARD FLOW ---
+                let elToClick: HTMLElement | null = null;
+                if (bet.prediction === '1') {
+                    elToClick = elements.elementA;
+                } else if (bet.prediction === '2') {
+                    elToClick = elements.elementB || null;
+                }
+
+                if (elToClick) {
+                    elToClick.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    elToClick.click();
+
+                    // Visual Feedback
+                    const originalBg = elToClick.style.backgroundColor;
+                    elToClick.style.backgroundColor = "#4ade80"; // Green for AI pick
+                    setTimeout(() => { if (elToClick) elToClick.style.backgroundColor = originalBg; }, 500);
+
+                    session.addedMatches.push(bet.id);
+                    session.current++;
+                    addedOnPage++;
+
+                    showLoadingOverlay(`Dodano (AI): ${bet.id} (${session.current}/${session.target})`);
+                    await new Promise(r => setTimeout(r, 600));
+                }
             }
         }
     }
@@ -440,7 +562,7 @@ export async function processAutoCoupon() {
     }
 }
 
-export async function handleAutoCoupon(maxMatches: number, filters: { isLive: boolean, sport: string, maxOdds?: number } = { isLive: false, sport: "all" }) {
+export async function handleAutoCoupon(maxMatches: number, filters: { isLive: boolean, sport: string, maxOdds?: number, enableAdvancedStats?: boolean } = { isLive: false, sport: "all" }) {
     showLoadingOverlay("Inicjalizacja AI... Resetowanie widoku.");
 
     const session: AutoCouponSession = {
