@@ -7,6 +7,7 @@
     let matchCount = 3;
     let isLive = false;
     let sportFilter = "all"; // all, football, tennis, basketball
+    let maxOdds = 2.5;
     let showFilters = false;
 
     let isValidDomain = false;
@@ -35,6 +36,7 @@
                     filters: {
                         isLive: isLive,
                         sport: sportFilter,
+                        maxOdds: maxOdds,
                     },
                 });
                 window.close(); // Close popup after action
@@ -189,6 +191,28 @@
                         min="1"
                         max="10"
                         bind:value={matchCount}
+                        class="w-full accent-[#d50032] h-1.5 bg-[#e5e7eb] rounded-lg appearance-none cursor-pointer"
+                    />
+                </div>
+
+                <div
+                    class="bg-white p-4 rounded-lg shadow-sm border border-[#e5e7eb]"
+                >
+                    <label
+                        for="maxOdds"
+                        class="text-xs text-[#6b7280] font-bold uppercase tracking-wider flex justify-between mb-3"
+                    >
+                        Maksymalny Kurs: <span class="text-[#d50032] text-sm"
+                            >{maxOdds.toFixed(2)}</span
+                        >
+                    </label>
+                    <input
+                        type="range"
+                        id="maxOdds"
+                        min="1.10"
+                        max="5.00"
+                        step="0.05"
+                        bind:value={maxOdds}
                         class="w-full accent-[#d50032] h-1.5 bg-[#e5e7eb] rounded-lg appearance-none cursor-pointer"
                     />
                 </div>

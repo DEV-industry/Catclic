@@ -10,6 +10,7 @@ export interface AutoCouponSession {
     filters: {
         isLive: boolean;
         sport: string;
+        maxOdds?: number;
     };
     liveRetryCount?: number;
     needsClearing?: boolean;
@@ -277,6 +278,21 @@ export async function processAutoCoupon() {
         const data = MatchParser.parse(container);
         if (!data || !data.elementA) continue;
 
+        // --- FILTER: MAX ODDS ---
+        const maxOdds = session.filters?.maxOdds || 100.0;
+        const currentOdds = parseFloat(data.oddsA.replace(',', '.'));
+
+        if (isNaN(currentOdds)) {
+            console.warn(`Could not parse odds for match ${data.id}: ${data.oddsA}`);
+            // Decide whether to skip or keep. Safe to skip.
+            continue;
+        }
+
+        if (currentOdds > maxOdds) {
+            console.log(`Skipping match ${data.id}: Odds ${currentOdds} > ${maxOdds}`);
+            continue;
+        }
+
         // Check Unique ID
         if (session.addedMatches && session.addedMatches.includes(data.id)) {
             console.log(`Match ${data.id} already added in this session. Skipping.`);
@@ -381,7 +397,7 @@ export async function processAutoCoupon() {
     }
 }
 
-export async function handleAutoCoupon(maxMatches: number, filters: { isLive: boolean, sport: string } = { isLive: false, sport: "all" }) {
+export async function handleAutoCoupon(maxMatches: number, filters: { isLive: boolean, sport: string, maxOdds?: number } = { isLive: false, sport: "all" }) {
     showLoadingOverlay("Inicjalizacja AI... Resetowanie widoku.");
 
     const session: AutoCouponSession = {

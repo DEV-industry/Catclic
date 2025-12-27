@@ -22,7 +22,7 @@
 
   let isLoading = false;
   let isGenerated = false;
-  const logoUrl = chrome.runtime.getURL("assets/logo.png");
+  const logoUrl = chrome.runtime.getURL("assets/icon-badge.png");
 
   async function getPrediction() {
     if (isLoading || isGenerated) return;
@@ -236,7 +236,7 @@
       <img
         src={logoUrl}
         alt="Catclic"
-        style="height: 18px; width: auto; object-fit: contain; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.8));"
+        style="height: 24px; width: auto; object-fit: contain; filter: grayscale(100%) brightness(1.5) drop-shadow(0 2px 3px rgba(0,0,0,0.5));"
       />
     {/if}
   </button>
