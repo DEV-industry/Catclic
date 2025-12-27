@@ -16,4 +16,9 @@ export class GeminiController {
     async getPrediction(@Body() body: PredictDto) {
         return this.geminiService.predictWinner(body.teamA, body.teamB, body.oddsA, body.oddsB);
     }
+
+    @Post('rank')
+    async rankMatches(@Body() body: { matches: any[], count: number }) {
+        return this.geminiService.rankMatches(body.matches, body.count);
+    }
 }

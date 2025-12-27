@@ -267,10 +267,14 @@ export async function processAutoCoupon() {
     // 1. Find matches on current page
     showLoadingOverlay(`Skanowanie oferty... ${session.current}/${session.target}`);
     const containers = MatchParser.findPossibleMatchContainers();
-    let addedOnPage = 0;
+
+    // --- AI SELECTION LOGIC ---
+    // 1. Collect Valid Candidates
+    const candidates: any[] = [];
+    const containerMap = new Map<string, { elementA: HTMLElement, elementB?: HTMLElement }>();
 
     for (const container of containers) {
-        if (session.current >= session.target) break;
+        if (session.current + candidates.length >= session.target) break; // Optimization? No, we want pool.
 
         const isLive = session.filters?.isLive || false;
         if (!isMatchValid(container, isLive)) continue;
@@ -282,50 +286,89 @@ export async function processAutoCoupon() {
         const maxOdds = session.filters?.maxOdds || 100.0;
         const currentOdds = parseFloat(data.oddsA.replace(',', '.'));
 
-        if (isNaN(currentOdds)) {
-            console.warn(`Could not parse odds for match ${data.id}: ${data.oddsA}`);
-            // Decide whether to skip or keep. Safe to skip.
-            continue;
-        }
-
-        if (currentOdds > maxOdds) {
-            console.log(`Skipping match ${data.id}: Odds ${currentOdds} > ${maxOdds}`);
-            continue;
-        }
+        if (isNaN(currentOdds)) continue;
+        if (currentOdds > maxOdds) continue;
 
         // Check Unique ID
-        if (session.addedMatches && session.addedMatches.includes(data.id)) {
-            console.log(`Match ${data.id} already added in this session. Skipping.`);
-            continue;
+        if (session.addedMatches && session.addedMatches.includes(data.id)) continue;
+
+        if (data.elementA.classList.contains('is-selected') || data.elementA.classList.contains('selected')) continue;
+
+        candidates.push({
+            id: data.id,
+            teamA: data.teamA,
+            teamB: data.teamB,
+            // odds: currentOdds // Optional
+        });
+        containerMap.set(data.id, { elementA: data.elementA, elementB: data.elementB });
+    }
+
+    let addedOnPage = 0;
+    let selectedBets: { id: string, prediction: '1' | '2' }[] = [];
+
+    if (candidates.length > 0) {
+        const needed = session.target - session.current;
+
+        console.log(`Found ${candidates.length} candidates. Asking AI to rank top ${needed}...`);
+        showLoadingOverlay(`AI analizuje ${candidates.length} kandydatów...`);
+
+        try {
+            // Call Backend
+            const response = await fetch('http://localhost:3000/predict/rank', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ matches: candidates, count: needed })
+            });
+
+            if (response.ok) {
+                selectedBets = await response.json();
+                console.log("AI Selected:", selectedBets);
+            } else {
+                throw new Error("Backend error");
+            }
+        } catch (e) {
+            console.error("AI Ranking Failed, falling back to random:", e);
+            // Fallback: Random selection to avoid left-side bias
+            const shuffled = candidates.sort(() => 0.5 - Math.random());
+            selectedBets = shuffled.slice(0, needed).map(c => ({
+                id: c.id,
+                prediction: Math.random() > 0.5 ? '1' : '2'
+            }));
         }
 
-        if (data.elementA.classList.contains('is-selected') || data.elementA.classList.contains('selected')) {
-            console.log("Match visually selected, skipping...");
-            continue;
+        // Process Selected
+        for (const bet of selectedBets) {
+            if (session.current >= session.target) break;
+
+            const elements = containerMap.get(bet.id);
+            if (!elements) continue;
+
+            let elToClick: HTMLElement | null = null;
+            if (bet.prediction === '1') {
+                elToClick = elements.elementA;
+            } else if (bet.prediction === '2') {
+                elToClick = elements.elementB || null;
+            }
+
+            if (elToClick) {
+                elToClick.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                elToClick.click();
+
+                // Visual Feedback
+                const originalBg = elToClick.style.backgroundColor;
+                elToClick.style.backgroundColor = "#4ade80"; // Green for AI pick
+                setTimeout(() => { if (elToClick) elToClick.style.backgroundColor = originalBg; }, 500);
+
+                session.addedMatches.push(bet.id);
+                session.current++;
+                addedOnPage++;
+
+                showLoadingOverlay(`Dodano (AI): ${bet.id} (${session.current}/${session.target})`);
+                await new Promise(r => setTimeout(r, 600));
+            } else {
+                console.warn(`Could not find element for bet ID ${bet.id} with prediction ${bet.prediction}`);
+            }
         }
-
-        data.elementA.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        data.elementA.click();
-
-        const originalBg = data.elementA.style.backgroundColor;
-        const el = data.elementA;
-        el.style.backgroundColor = "#4ade80";
-        setTimeout(() => { if (el) el.style.backgroundColor = originalBg; }, 500);
-
-        // Add to history
-        session.addedMatches.push(data.id);
-        session.current++;
-        addedOnPage++;
-
-        if (session.liveRetryCount && session.liveRetryCount > 0) {
-            session.liveRetryCount = 0;
-            // setSession below covers this
-        }
-
-        // Update overlay
-        showLoadingOverlay(`Dodano mecz: ${data.teamA} vs ${data.teamB} (${session.current}/${session.target})`);
-
-        await new Promise(r => setTimeout(r, 400));
     }
 
     // Update consecutive empty logic

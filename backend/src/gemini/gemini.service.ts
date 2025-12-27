@@ -103,4 +103,61 @@ export class GeminiService {
             };
         }
     }
+    async rankMatches(matches: any[], count: number = 3): Promise<Array<{ id: string, prediction: '1' | '2' }>> {
+        const cacheKey = `rank-${JSON.stringify(matches.map(m => m.id))}`;
+        if (this.cache.has(cacheKey)) {
+            return this.cache.get(cacheKey);
+        }
+
+        const candidates = matches.map(m => `- ID: ${m.id} | ${m.teamA} (Odds: ${m.oddsA}) vs ${m.teamB} (Odds: ${m.oddsB})`).join('\n');
+
+        const prompt = `
+            Act as a football betting expert.
+            I have a list of matches. Select exactly ${count} matches that are the "safest" or best value bets.
+            For each selected match, predict the winner ("1" for Home, "2" for Away).
+            
+            Candidates:
+            ${candidates}
+
+            Instructions:
+            1. Select exactly ${count} matches.
+            2. Return a JSON array of objects with "id" and "prediction".
+            3. "prediction" must be "1" or "2".
+            4. Do NOT include markdown code blocks. Return RAW JSON.
+            
+            Example:
+            [{"id": "match-1", "prediction": "1"}, {"id": "match-2", "prediction": "2"}]
+        `;
+
+        try {
+            // Force JSON via generation config if supported, otherwise rely on prompt
+            const result = await this.model.generateContent({
+                contents: [{ role: 'user', parts: [{ text: prompt }] }],
+                generationConfig: { responseMimeType: "application/json" }
+            });
+
+            const response = await result.response;
+            const text = response.text();
+
+            // Cleanup: Find the first '[' and the last ']' to ignore any text before or after
+            const firstBracket = text.indexOf('[');
+            const lastBracket = text.lastIndexOf(']');
+
+            if (firstBracket === -1 || lastBracket === -1) {
+                throw new Error("No JSON array found in response");
+            }
+
+            const cleanText = text.substring(firstBracket, lastBracket + 1);
+            const json = JSON.parse(cleanText);
+
+            if (Array.isArray(json)) {
+                this.cache.set(cacheKey, json);
+                return json;
+            }
+            return [];
+        } catch (error) {
+            this.logger.error(`Ranking Error: ${error.message} \nResponse: ${error || 'null'}`);
+            return [];
+        }
+    }
 }
