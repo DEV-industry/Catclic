@@ -103,7 +103,7 @@ export class GeminiService {
             };
         }
     }
-    async rankMatches(matches: any[], count: number = 3): Promise<Array<{ id: string, prediction: '1' | '2' }>> {
+    async rankMatches(matches: any[], count: number = 3): Promise<Array<{ id: string, prediction: '1' | '2', reason: string }>> {
         const cacheKey = `rank-${JSON.stringify(matches.map(m => m.id))}`;
         if (this.cache.has(cacheKey)) {
             return this.cache.get(cacheKey);
@@ -121,12 +121,13 @@ export class GeminiService {
 
             Instructions:
             1. Select exactly ${count} matches.
-            2. Return a JSON array of objects with "id" and "prediction".
+            2. Return a JSON array of objects with "id", "prediction" (1 or 2), and "reason".
             3. "prediction" must be "1" or "2".
-            4. Do NOT include markdown code blocks. Return RAW JSON.
+            4. "reason" must be a concise justification in Polish (max 10 words) explaining why this bet is valuable (e.g., "Silny gospodarz", "Goście w formie").
+            5. Do NOT include markdown code blocks. Return RAW JSON.
             
             Example:
-            [{"id": "match-1", "prediction": "1"}, {"id": "match-2", "prediction": "2"}]
+            [{"id": "match-1", "prediction": "1", "reason": "Gospodarze wygrali 5 ostatnich meczy"}, {"id": "match-2", "prediction": "2", "reason": "Goście mają lepszy atak"}]
         `;
 
         try {

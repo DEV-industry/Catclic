@@ -2,6 +2,7 @@ import type { PlasmoCSConfig } from "plasmo"
 import { handleAutoCoupon, processAutoCoupon, getSession } from "../services/AutoCouponManager"
 import { replaceLogoWithCustom, showLoadingOverlay } from "../services/UIService"
 import { scanAndInject } from "../services/PredictionInjector"
+import { startReasonInjector } from "../services/CouponManager"
 
 // @ts-ignore
 import cssText from "data-text:../../style.css"
@@ -52,9 +53,11 @@ async function checkAndRestoreOverlay() {
 // Run immediately to catch it as fast as possible
 checkAndRestoreOverlay();
 
+
 window.addEventListener("load", () => {
     replaceLogoWithCustom();
     scanAndInject();
+    startReasonInjector();
     observer.observe(document.body, { childList: true, subtree: true });
 
     // Resume Auto-Coupon if active

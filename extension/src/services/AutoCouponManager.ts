@@ -1,6 +1,6 @@
 import { MatchParser } from "./MatchParser"
 import { MatchDetailsParser } from "./MatchDetailsParser"
-import { clearCoupon, isMatchValid, getBetCount } from "./CouponManager"
+import { clearCoupon, isMatchValid, getBetCount, saveReason } from "./CouponManager"
 import { showToast, showLoadingOverlay, hideLoadingOverlay } from "./UIService"
 
 export interface AutoCouponSession {
@@ -283,7 +283,7 @@ export async function processAutoCoupon() {
     // --- AI SELECTION LOGIC ---
     // 1. Collect Valid Candidates
     const candidates: any[] = [];
-    const containerMap = new Map<string, { elementA: HTMLElement, elementB?: HTMLElement, element: HTMLElement }>();
+    const containerMap = new Map<string, { elementA: HTMLElement, elementB?: HTMLElement, element: HTMLElement, teamA: string }>();
 
     for (const container of containers) {
         if (session.current + candidates.length >= session.target) break; // Optimization? No, we want pool.
@@ -312,11 +312,11 @@ export async function processAutoCoupon() {
             teamB: data.teamB,
             // odds: currentOdds // Optional
         });
-        containerMap.set(data.id, { elementA: data.elementA, elementB: data.elementB, element: data.element });
+        containerMap.set(data.id, { elementA: data.elementA, elementB: data.elementB, element: data.element, teamA: data.teamA });
     }
 
     let addedOnPage = 0;
-    let selectedBets: { id: string, prediction: '1' | '2' | 'advanced', advancedSelection?: string, teamA?: string }[] = [];
+    let selectedBets: { id: string, prediction: '1' | '2' | 'advanced', advancedSelection?: string, teamA?: string, reason?: string }[] = [];
 
     if (candidates.length > 0) {
         const needed = session.target - session.current;
@@ -363,7 +363,8 @@ export async function processAutoCoupon() {
             selectedBets = shuffled.slice(0, needed).map(c => ({
                 id: c.id,
                 teamA: c.teamA,
-                prediction: Math.random() > 0.5 ? '1' : '2'
+                prediction: Math.random() > 0.5 ? '1' : '2',
+                reason: "Losowy wybór (Fallback)"
             }));
         }
 
@@ -434,7 +435,7 @@ export async function processAutoCoupon() {
 
                 if (chosenBet) {
                     chosenBet.element.click();
-                    showLoadingOverlay(`Dodano (AI Advanced): ${chosenBet.selection}`);
+                    showLoadingOverlay(`Dodano: ${elements.teamA} (Advanced)`);
                     session.addedMatches.push(bet.id);
                     session.current++;
                     addedOnPage++;
@@ -464,7 +465,7 @@ export async function processAutoCoupon() {
                                 session.addedMatches.push(bet.id);
                                 session.current++;
                                 addedOnPage++;
-                                showLoadingOverlay(`Dodano (Standard Fallback): ${bet.teamA}`);
+                                showLoadingOverlay(`Dodano: ${bet.teamA || "Mecz"} (Fallback)`);
                             }
                         }
                     } catch (e) {
@@ -496,8 +497,13 @@ export async function processAutoCoupon() {
                     session.current++;
                     addedOnPage++;
 
-                    showLoadingOverlay(`Dodano (AI): ${bet.id} (${session.current}/${session.target})`);
-                    await new Promise(r => setTimeout(r, 600));
+                    // SHOW REASON
+                    const reason = bet.reason || "Wybór AI";
+                    if (elements.teamA) {
+                        saveReason(elements.teamA, reason);
+                    }
+                    showLoadingOverlay(`Dodano: ${elements.teamA}\n${reason}`);
+                    await new Promise(r => setTimeout(r, 2000)); // Give time to read
                 }
             }
         }
