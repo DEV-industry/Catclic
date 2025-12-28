@@ -16,6 +16,31 @@ export function isMatchValid(element: HTMLElement, isLive: boolean): boolean {
     }
 
     // 2. STANDARD MODE (Default: Today)
+    // CRITICAL FIX: Explicitly exclude matches that are ALREADY LIVE
+    // User reported that live matches have class 'is-live'
+    if (
+        element.classList.contains('is-live') ||
+        element.querySelector('.is-live') ||
+        element.closest('.is-live')
+    ) {
+        console.log("Skipping live match (class detected) in standard mode:", text);
+        return false;
+    }
+
+    // NEW: HREF Check (Robust)
+    // If the match card links to a /live/ URL, it is definitely live.
+    const link = element.tagName === 'A' ? element as HTMLAnchorElement : element.querySelector('a');
+    if (link && link.href && link.href.includes('/live/')) {
+        console.log("Skipping live match (href detected) in standard mode:", link.href);
+        return false;
+    }
+
+    // Heuristic: Check for "Teraz" or time indications (e.g. 15', 90+2')
+    if (text.includes("teraz") || /\d{1,2}'/.test(text)) {
+        console.log("Skipping live match (text detected) in standard mode:", text);
+        return false;
+    }
+
     // Falls back to "Today" logic if not Live mode
     if (text.includes("jutro") || text.includes("pojutrze")) return false;
     if (text.includes("dzisiaj")) return true;

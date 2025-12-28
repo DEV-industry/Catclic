@@ -83,6 +83,10 @@ function navigateToNextLeague(visited: string[], sportFilter: string) {
         if (href === window.location.href) return false;
         if (set.has(href)) return false;
 
+        // 6. CRITICAL: Avoid actual Match pages (contain -m followed by digits)
+        // e.g. /pilka-nozna-s1/liga-c123/mecz-m456
+        if (href.includes("-m") && /\-m\d+/.test(href)) return false;
+
         return true;
     });
 
@@ -265,6 +269,12 @@ export async function processAutoCoupon() {
             return;
         }
     }
+
+    // 0b. Scroll to ensure lazy-loaded matches (like "at the bottom") are visible
+    window.scrollTo({ top: document.body.scrollHeight / 2, behavior: 'smooth' });
+    await new Promise(r => setTimeout(r, 800));
+    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+    await new Promise(r => setTimeout(r, 1200));
 
     // 1. Find matches on current page
     showLoadingOverlay(`Skanowanie oferty... ${session.current}/${session.target}`);
