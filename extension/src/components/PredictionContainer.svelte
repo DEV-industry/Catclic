@@ -9,7 +9,7 @@
   export let oddsB;
   export let elementA;
   export let elementB;
-  export let buttonTopOffset = null; // New prop for custom positioning
+  export let fullCardElement = null;
 
   let prediction = "";
   let summary = "";
@@ -146,6 +146,28 @@
     };
   }
 
+  function portalToCard(node, target) {
+    if (!target) return;
+    target.appendChild(node);
+
+    // Ensure absolute matching
+    node.style.position = "absolute";
+    node.style.top = "0";
+    node.style.left = "0";
+    node.style.width = "100%";
+    node.style.height = "100%";
+    node.style.zIndex = "2000";
+    node.style.borderRadius = "inherit";
+
+    return {
+      destroy() {
+        if (node.parentNode) {
+          node.parentNode.removeChild(node);
+        }
+      },
+    };
+  }
+
   onDestroy(() => {
     if (highlightedElement) {
       highlightedElement.removeEventListener("mouseenter", handleMouseEnter);
@@ -189,8 +211,8 @@
   </div>
 {/if}
 
-{#if isLoading}
-  <div class="loading-overlay">
+{#if isLoading && fullCardElement}
+  <div use:portalToCard={fullCardElement} class="loading-overlay">
     <div class="loading-dots">
       <div class="dot"></div>
       <div class="dot"></div>
@@ -206,7 +228,6 @@
     on:click|stopPropagation|preventDefault={getPrediction}
     on:mousedown|stopPropagation
     on:mouseup|stopPropagation
-    style={buttonTopOffset !== null ? `top: ${buttonTopOffset - 20}px;` : ""}
   >
     <img
       src={logoUrl}
@@ -219,10 +240,11 @@
 <style>
   .catclic-trigger {
     position: absolute;
-    top: 15%; /* Default fallback */
+    top: 50%; /* Center vertically */
+    right: 0; /* Align to the right edge of the scoreboard info */
     bottom: auto;
-    left: 50%;
-    transform: translateX(-50%);
+    left: auto;
+    transform: translateY(-50%);
     z-index: 1000;
     background: transparent;
     border: none;
@@ -232,18 +254,12 @@
     justify-content: center;
     cursor: pointer;
     pointer-events: auto;
-    transition: transform 0.2s;
-  }
-  .catclic-trigger:hover {
-    transform: translateX(-50%) scale(1.1);
+    cursor: pointer;
+    pointer-events: auto;
   }
 
   .loading-overlay {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
+    /* Position handled by portalToCard */
     background: rgba(0, 0, 0, 0.5); /* Dark background */
     backdrop-filter: blur(4px); /* Blur effect */
     display: flex;
