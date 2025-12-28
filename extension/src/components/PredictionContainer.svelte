@@ -1,25 +1,25 @@
-<script lang="ts">
+<script>
   import { onMount, onDestroy } from "svelte";
   import Tooltip from "./Tooltip.svelte";
   import AnalysisModal from "./AnalysisModal.svelte";
 
-  export let teamA: string;
-  export let teamB: string;
-  export let oddsA: any;
-  export let oddsB: any;
-  export let elementA: HTMLElement;
-  export let elementB: HTMLElement;
-  export let buttonTopOffset: number | null = null; // New prop for custom positioning
+  export let teamA;
+  export let teamB;
+  export let oddsA;
+  export let oddsB;
+  export let elementA;
+  export let elementB;
+  export let buttonTopOffset = null; // New prop for custom positioning
 
   let prediction = "";
   let summary = "";
   let fullAnalysis = "";
-  let stats: any = null;
+  let stats = null;
   let showTooltip = false;
   let showModal = false;
-  let highlightedElement: HTMLElement | null = null;
+  let highlightedElement = null;
   let tooltipPosition = { top: 0, left: 0 };
-  let closeTimeout: any;
+  let closeTimeout;
 
   let isLoading = false;
   let isGenerated = false;
@@ -95,7 +95,7 @@
     }
   }
 
-  function handleMouseEnter(e: MouseEvent) {
+  function handleMouseEnter(e) {
     if (!highlightedElement) return;
     clearTimeout(closeTimeout);
 
@@ -135,7 +135,7 @@
     showTooltip = false;
   }
 
-  function portal(node: HTMLElement) {
+  function portal(node) {
     document.body.appendChild(node);
     return {
       destroy() {
