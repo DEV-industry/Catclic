@@ -101,7 +101,22 @@ function navigateToNextLeague(visited: string[], sportFilter: string) {
         showToast(`Przechodzę do: ${next.innerText || "kolejnej ligi"}...`);
         window.location.href = next.href;
     } else {
-        console.log("No more leagues found to navigate.");
+        console.log("No more leagues found on this page.");
+
+        // Fallback: If we are deep in a league and run out of links, go back to the Main Sport Page
+        // to find other leagues.
+        const sport = sportFilter !== "all" ? sportFilter : "football"; // Default to football if all
+        const hubUrl = getSportHubUrl(sport);
+
+        // Only go to hub if we are not already there
+        if (hubUrl && window.location.href !== hubUrl && !visited.includes(hubUrl)) {
+            console.log("Fallback: Returning to Sport Hub to find more leagues ->", hubUrl);
+            showToast("Powrót do głównej kategorii, aby znaleźć więcej lig...");
+            window.location.href = hubUrl;
+            return;
+        }
+
+        console.log("No more leagues found anywhere. Stopping.");
         showToast("Nie znaleziono więcej unikalnych lig do przeszukania.");
         setSession({
             active: false,
@@ -114,6 +129,18 @@ function navigateToNextLeague(visited: string[], sportFilter: string) {
             addedMatches: []
         });
         hideLoadingOverlay();
+    }
+}
+
+// --- HELPER: GET HUB URL ---
+function getSportHubUrl(sport: string): string {
+    switch (sport) {
+        case "football": return "https://www.betclic.pl/pilka-nozna-s1";
+        case "tennis": return "https://www.betclic.pl/tenis-s2";
+        case "basketball": return "https://www.betclic.pl/koszykowka-s4";
+        case "volleyball": return "https://www.betclic.pl/siatkowka-s3";
+        case "hockey": return "https://www.betclic.pl/hokej-s13";
+        default: return "https://www.betclic.pl/pilka-nozna-s1";
     }
 }
 
@@ -270,11 +297,31 @@ export async function processAutoCoupon() {
         }
     }
 
+    // --- HELPER: ROBUST SCROLLING ---
+    const scrollUntilStable = async () => {
+        let lastHeight = 0;
+        let sameHeightCount = 0;
+        const MAX_SCROLLS = 15; // Limit to avoid infinite loops
+
+        for (let i = 0; i < MAX_SCROLLS; i++) {
+            const currentHeight = document.body.scrollHeight;
+            window.scrollTo({ top: currentHeight, behavior: 'instant' }); // Use instant for speed
+            await new Promise(r => setTimeout(r, 1000)); // Wait for lazy load
+
+            if (currentHeight === lastHeight) {
+                sameHeightCount++;
+                if (sameHeightCount >= 2) break; // Stop if height is stable for 2 iterations
+            } else {
+                sameHeightCount = 0;
+            }
+            lastHeight = currentHeight;
+        }
+    };
+
     // 0b. Scroll to ensure lazy-loaded matches (like "at the bottom") are visible
-    window.scrollTo({ top: document.body.scrollHeight / 2, behavior: 'smooth' });
-    await new Promise(r => setTimeout(r, 800));
-    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
-    await new Promise(r => setTimeout(r, 1200));
+    // Replaced static scroll with robust loop to handle long lists (Infinite Scroll)
+    showLoadingOverlay(`Przewijanie listy... ${session.current}/${session.target}`);
+    await scrollUntilStable();
 
     // 1. Find matches on current page
     showLoadingOverlay(`Skanowanie oferty... ${session.current}/${session.target}`);
@@ -556,8 +603,7 @@ export async function processAutoCoupon() {
                 session.liveRetryCount = retries + 1;
                 await setSession(session);
 
-                window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
-                await new Promise(r => setTimeout(r, 2000));
+                await scrollUntilStable();
             } else {
                 session.liveRetryCount = 0;
                 await setSession(session);
