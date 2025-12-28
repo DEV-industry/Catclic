@@ -22,10 +22,19 @@ export function scanAndInject() {
         (container as HTMLElement).style.position = "relative";
 
         if (data.elementA && data.elementB) {
-            // Find the best anchor point - try to find the scoreboard wrapper (team names container)
-            // This ensures consistent positioning relative to the text, regardless of card type (video vs white)
+            // Use the container itself as the anchor to cover the entire card (including odds)
+            const targetParent = container as HTMLElement;
+
+            // Find the scoreboard wrapper to position the button correctly relative to the text
             const scoreboardAnchor = container.querySelector('.scoreboard_wrapper, .scoreboard, .contestants-container') || container;
-            const targetParent = scoreboardAnchor as HTMLElement;
+
+            let buttonTopOffset = null;
+            if (scoreboardAnchor && scoreboardAnchor !== container) {
+                const containerRect = targetParent.getBoundingClientRect();
+                const scoreboardRect = scoreboardAnchor.getBoundingClientRect();
+                // Calculate offset relative to the container
+                buttonTopOffset = scoreboardRect.top - containerRect.top;
+            }
 
             // Ensure parent is relative so absolute child is positioned correctly
             targetParent.style.position = 'relative';
@@ -51,7 +60,8 @@ export function scanAndInject() {
                     oddsA: data.oddsA,
                     oddsB: data.oddsB,
                     elementA: data.elementA,
-                    elementB: data.elementB
+                    elementB: data.elementB,
+                    buttonTopOffset: buttonTopOffset
                 }
             });
 

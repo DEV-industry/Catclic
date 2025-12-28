@@ -1,24 +1,25 @@
-<script>
+<script lang="ts">
   import { onMount, onDestroy } from "svelte";
   import Tooltip from "./Tooltip.svelte";
   import AnalysisModal from "./AnalysisModal.svelte";
 
-  export let teamA;
-  export let teamB;
-  export let oddsA;
-  export let oddsB;
-  export let elementA;
-  export let elementB;
+  export let teamA: string;
+  export let teamB: string;
+  export let oddsA: any;
+  export let oddsB: any;
+  export let elementA: HTMLElement;
+  export let elementB: HTMLElement;
+  export let buttonTopOffset: number | null = null; // New prop for custom positioning
 
   let prediction = "";
   let summary = "";
   let fullAnalysis = "";
-  let stats = null;
+  let stats: any = null;
   let showTooltip = false;
   let showModal = false;
-  let highlightedElement = null;
+  let highlightedElement: HTMLElement | null = null;
   let tooltipPosition = { top: 0, left: 0 };
-  let closeTimeout;
+  let closeTimeout: any;
 
   let isLoading = false;
   let isGenerated = false;
@@ -47,26 +48,8 @@
       isGenerated = true;
       applyHighlight();
 
-      // Auto-open tooltip after generation to show result immediately
+      // Auto-open tooltip logic removed as discussed (left empty)
       if (highlightedElement) {
-        // Calculate position immediately relative to the button or the element?
-        // Existing logic uses hover on element. Let's try to simulate that or just define position.
-        // Let's rely on the user hovering for now, OR better, open it near the button/element.
-        // But the `applyHighlight` adds listeners.
-        // Let's just let the user hover or click "See analysis" if I add it.
-        // Wait, the user screenshot shows the tooltip OPEN.
-        // I'll try to simulate a mouse enter or just set showTooltip = true with a default position?
-        // Position is tricky without an event.
-        // I'll defer auto-opening to keep it simple, or maybe just point to the highlight.
-        // Actually, if I just highlight, the user will see it.
-        // NEW REQUIREMENT: "In the top right corner... icon Catclic where after pressing it only then will start generating"
-        // Doesn't explicitly say "and open it".
-        // But "Catclic" card in screenshot looks like the result.
-        // Let's leave it as: Click -> Load -> Highlight (Green) -> Button becomes "Check" or just stays?
-        // I'll hide the button if it obstructs, or keep it.
-        // I'll keep the button invisible after generation? No, maybe I want to regenerate?
-        // Let's hide the button after generation so it doesn't block the view, or maybe change it to "Analiza gotowa".
-        // I'll simply hide the trigger button after successful generation.
       }
     } catch (e) {
       console.error("Prediction failed", e);
@@ -112,7 +95,7 @@
     }
   }
 
-  function handleMouseEnter(e) {
+  function handleMouseEnter(e: MouseEvent) {
     if (!highlightedElement) return;
     clearTimeout(closeTimeout);
 
@@ -152,7 +135,7 @@
     showTooltip = false;
   }
 
-  function portal(node) {
+  function portal(node: HTMLElement) {
     document.body.appendChild(node);
     return {
       destroy() {
@@ -206,63 +189,99 @@
   </div>
 {/if}
 
-{#if !isGenerated}
+{#if isLoading}
+  <div class="loading-overlay">
+    <div class="loading-dots">
+      <div class="dot"></div>
+      <div class="dot"></div>
+      <div class="dot"></div>
+    </div>
+  </div>
+{/if}
+
+{#if !isGenerated && !isLoading}
   <button
     class="catclic-trigger"
     title="Wygeneruj predykcję Catclic"
     on:click|stopPropagation|preventDefault={getPrediction}
     on:mousedown|stopPropagation
     on:mouseup|stopPropagation
+    style={buttonTopOffset !== null ? `top: ${buttonTopOffset - 20}px;` : ""}
   >
-    {#if isLoading}
-      <div class="spinner"></div>
-    {:else}
-      <img
-        src={logoUrl}
-        alt="Catclic"
-        style="height: 24px; width: auto; object-fit: contain; filter: grayscale(100%) brightness(1.5) drop-shadow(0 2px 3px rgba(0,0,0,0.5));"
-      />
-    {/if}
+    <img
+      src={logoUrl}
+      alt="Catclic"
+      style="height: 24px; width: auto; object-fit: contain; filter: grayscale(100%) brightness(1.5) drop-shadow(0 2px 3px rgba(0,0,0,0.5));"
+    />
   </button>
-
-  <style>
-    .catclic-trigger {
-      position: absolute;
-      top: -20px;
-      bottom: auto;
-      left: 50%;
-      transform: translateX(-50%);
-      z-index: 1000;
-      background: transparent;
-      border: none;
-      padding: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      pointer-events: auto;
-      transition: transform 0.2s;
-    }
-    .catclic-trigger:hover {
-      transform: translateX(-50%) scale(1.1);
-    }
-    .spinner {
-      width: 16px;
-      height: 16px;
-      border: 2px solid #d50032;
-      border-bottom-color: transparent;
-      border-radius: 50%;
-      display: inline-block;
-      box-sizing: border-box;
-      animation: rotation 1s linear infinite;
-    }
-    @keyframes rotation {
-      0% {
-        transform: rotate(0deg);
-      }
-      100% {
-        transform: rotate(360deg);
-      }
-    }
-  </style>
 {/if}
+
+<style>
+  .catclic-trigger {
+    position: absolute;
+    top: 15%; /* Default fallback */
+    bottom: auto;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1000;
+    background: transparent;
+    border: none;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    pointer-events: auto;
+    transition: transform 0.2s;
+  }
+  .catclic-trigger:hover {
+    transform: translateX(-50%) scale(1.1);
+  }
+
+  .loading-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5); /* Dark background */
+    backdrop-filter: blur(4px); /* Blur effect */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 2000;
+    pointer-events: auto; /* Block clicks */
+    border-radius: inherit;
+  }
+
+  .loading-dots {
+    display: flex;
+    gap: 8px;
+  }
+
+  .dot {
+    width: 10px;
+    height: 10px;
+    background-color: white;
+    border-radius: 50%;
+    animation: bounce 1.4s infinite ease-in-out both;
+  }
+
+  .dot:nth-child(1) {
+    animation-delay: -0.32s;
+  }
+  .dot:nth-child(2) {
+    animation-delay: -0.16s;
+  }
+
+  @keyframes bounce {
+    0%,
+    80%,
+    100% {
+      transform: scale(0);
+    }
+    40% {
+      transform: scale(1);
+    }
+  }
+</style>
