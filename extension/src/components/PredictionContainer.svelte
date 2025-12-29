@@ -157,7 +157,7 @@
     node.style.left = "0";
     node.style.width = "100%";
     node.style.height = "100%";
-    node.style.zIndex = "2000";
+    node.style.zIndex = "1";
     node.style.borderRadius = "inherit";
 
     return {
@@ -249,7 +249,7 @@
     bottom: auto;
     left: auto;
     transform: translateY(-50%);
-    z-index: 1000;
+    z-index: 1;
     background: transparent;
     border: none;
     padding: 0;
@@ -269,17 +269,13 @@
     display: flex;
     justify-content: center;
     align-items: center;
-    z-index: 2000;
+    z-index: 1;
     pointer-events: auto; /* Block clicks */
     border-radius: inherit;
     border: 8px solid #b51721;
     box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.7);
     flex-direction: column;
     gap: 16px;
-  }
-
-  .overlay-logo-container {
-    /* Removed absolute positioning to center in flex container */
   }
 
   .overlay-logo {

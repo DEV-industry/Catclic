@@ -38,7 +38,7 @@ export function scanAndInject() {
             appRoot.style.left = "0";
             appRoot.style.width = "100%";
             appRoot.style.height = "100%";
-            appRoot.style.zIndex = "10";
+            appRoot.style.zIndex = "1";
             appRoot.style.pointerEvents = "none"; // Let clicks pass through unless on tooltip
 
             // Check if already injected in this specific parent (double safety)
