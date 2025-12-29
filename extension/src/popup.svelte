@@ -57,7 +57,7 @@
     >
         <!-- Header -->
         <div
-            class="px-5 py-3 bg-[#d50032] flex items-center justify-between shrink-0 shadow-md z-10"
+            class="px-5 py-3 bg-[#b51721] flex items-center justify-between shrink-0 shadow-md z-10"
         >
             <div class="flex items-center gap-3">
                 <!-- Logo Image -->
@@ -68,7 +68,7 @@
                 />
             </div>
             <div
-                class="text-[10px] text-[#d50032] font-bold bg-white px-2 py-0.5 rounded uppercase tracking-wider"
+                class="text-[10px] text-[#b51721] font-bold bg-white px-2 py-0.5 rounded uppercase tracking-wider"
             >
                 BETA
             </div>
@@ -103,7 +103,7 @@
                 <div class="flex justify-end">
                     <button
                         on:click={() => (showFilters = !showFilters)}
-                        class="text-xs text-[#6b7280] font-bold uppercase tracking-wider flex items-center gap-2 hover:text-[#d50032] transition-colors bg-transparent border-0 cursor-pointer p-0"
+                        class="text-xs text-[#6b7280] font-bold uppercase tracking-wider flex items-center gap-2 hover:text-[#b51721] transition-colors bg-transparent border-0 cursor-pointer p-0"
                     >
                         <svg
                             xmlns="http://www.w3.org/2000/svg"
@@ -141,7 +141,7 @@
                                 on:click={() => (isLive = !isLive)}
                                 class={`w-full text-sm font-bold py-1.5 px-3 rounded transition-all flex items-center justify-between border ${
                                     isLive
-                                        ? "bg-red-50 text-[#d50032] border-[#d50032]"
+                                        ? "bg-red-50 text-[#b51721] border-[#b51721]"
                                         : "bg-gray-50 text-[#6b7280] border-transparent hover:bg-gray-100"
                                 }`}
                             >
@@ -149,7 +149,7 @@
                                 <div
                                     class={`w-3 h-3 rounded-full shadow-sm transition-colors ${
                                         isLive
-                                            ? "bg-[#d50032] animate-pulse"
+                                            ? "bg-[#b51721] animate-pulse"
                                             : "bg-gray-300"
                                     }`}
                                 ></div>
@@ -193,7 +193,7 @@
                         <button
                             on:click={() =>
                                 (enableAdvancedStats = !enableAdvancedStats)}
-                            class={`relative w-11 h-6 transition-colors rounded-full ${enableAdvancedStats ? "bg-[#d50032]" : "bg-gray-200"}`}
+                            class={`relative w-11 h-6 transition-colors rounded-full ${enableAdvancedStats ? "bg-[#b51721]" : "bg-gray-200"}`}
                         >
                             <span
                                 class={`absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${enableAdvancedStats ? "translate-x-5" : "translate-x-0"}`}
@@ -209,7 +209,7 @@
                         for="matchCount"
                         class="text-xs text-[#6b7280] font-bold uppercase tracking-wider flex justify-between mb-3"
                     >
-                        Liczba meczów: <span class="text-[#d50032] text-sm"
+                        Liczba meczów: <span class="text-[#b51721] text-sm"
                             >{matchCount}</span
                         >
                     </label>
@@ -219,7 +219,7 @@
                         min="1"
                         max="10"
                         bind:value={matchCount}
-                        class="w-full accent-[#d50032] h-1.5 bg-[#e5e7eb] rounded-lg appearance-none cursor-pointer"
+                        class="w-full accent-[#b51721] h-1.5 bg-[#e5e7eb] rounded-lg appearance-none cursor-pointer"
                     />
                 </div>
 
@@ -230,7 +230,7 @@
                         for="maxOdds"
                         class="text-xs text-[#6b7280] font-bold uppercase tracking-wider flex justify-between mb-3"
                     >
-                        Maksymalny Kurs: <span class="text-[#d50032] text-sm"
+                        Maksymalny Kurs: <span class="text-[#b51721] text-sm"
                             >{maxOdds.toFixed(2)}</span
                         >
                     </label>
@@ -241,7 +241,7 @@
                         max="5.00"
                         step="0.05"
                         bind:value={maxOdds}
-                        class="w-full accent-[#d50032] h-1.5 bg-[#e5e7eb] rounded-lg appearance-none cursor-pointer"
+                        class="w-full accent-[#b51721] h-1.5 bg-[#e5e7eb] rounded-lg appearance-none cursor-pointer"
                     />
                 </div>
 
@@ -285,28 +285,36 @@
     </div>
 {:else}
     <div
-        class="w-[300px] bg-white p-6 flex flex-col items-center justify-center gap-4 text-center min-h-[250px] shadow-lg"
+        class="w-[300px] bg-white flex flex-col items-center justify-center p-5 text-center min-h-[250px] shadow-2xl border-t-4 border-[#b51721]"
     >
         <div
-            class="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mb-2"
+            class="mb-3 transform hover:scale-105 transition-transform duration-300 bg-[#b51721] rounded-full p-3 shadow-lg"
         >
             <img
                 src="../../assets/logo.png"
-                alt="Betclic Only"
-                class="h-10 w-auto opacity-50 grayscale"
+                alt="Catclic Logo"
+                class="h-6 w-auto drop-shadow-sm"
             />
         </div>
-        <h3 class="text-[#0d1620] font-bold text-lg m-0">Tylko na Betclic</h3>
-        <p class="text-xs text-[#6b7280] m-0 leading-relaxed">
+        <h3 class="text-base font-bold text-[#0d1620] mb-1">
+            Tylko na Betclic
+        </h3>
+        <p class="text-[11px] text-[#6b7280] mb-4 leading-relaxed px-1">
             To rozszerzenie działa wyłącznie na stronie Betclic.pl. Przejdź do
             serwisu, aby skorzystać z funkcji.
         </p>
         <button
             on:click={openBetclic}
-            class="mt-2 px-5 py-2.5 bg-[#d50032] text-white text-xs font-bold rounded-full hover:bg-[#b00029] transition-colors border-0 cursor-pointer uppercase tracking-wider"
+            class="w-full py-2 bg-[#b51721] text-white text-xs font-bold rounded-md hover:bg-[#900f18] transition-all transform hover:-translate-y-0.5 shadow-sm hover:shadow-md border-0 cursor-pointer uppercase tracking-wide"
         >
             Przejdź do Betclic.pl
         </button>
+
+        <img
+            src="../../assets/catclic-sleepy.png"
+            alt="Sleepy Cat"
+            class="mt-4 w-20 h-auto opacity-90 drop-shadow-sm hover:scale-105 transition-transform duration-500"
+        />
     </div>
 {/if}
 
