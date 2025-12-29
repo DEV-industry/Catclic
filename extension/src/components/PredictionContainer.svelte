@@ -24,6 +24,7 @@
   let isLoading = false;
   let isGenerated = false;
   const logoUrl = chrome.runtime.getURL("assets/icon-badge.png");
+  const mainLogoUrl = chrome.runtime.getURL("assets/logo.png");
 
   async function getPrediction() {
     if (isLoading || isGenerated) return;
@@ -213,6 +214,9 @@
 
 {#if isLoading && fullCardElement}
   <div use:portalToCard={fullCardElement} class="loading-overlay">
+    <div class="overlay-logo-container">
+      <img src={mainLogoUrl} class="overlay-logo" alt="Catclic" />
+    </div>
     <div class="loading-dots">
       <div class="dot"></div>
       <div class="dot"></div>
@@ -268,6 +272,20 @@
     z-index: 2000;
     pointer-events: auto; /* Block clicks */
     border-radius: inherit;
+    border: 8px solid #b51721;
+    box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.7);
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .overlay-logo-container {
+    /* Removed absolute positioning to center in flex container */
+  }
+
+  .overlay-logo {
+    height: 32px;
+    width: auto;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
   }
 
   .loading-dots {
