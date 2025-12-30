@@ -385,7 +385,7 @@ export async function processAutoCoupon() {
 
         try {
             // Rank for Standard First
-            const response = await fetch('http://localhost:3000/predict/rank', {
+            const response = await fetch('https://catclic.onrender.com/predict/rank', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ matches: candidates, count: needed })
