@@ -30,7 +30,7 @@
     if (isLoading || isGenerated) return;
     isLoading = true;
     try {
-      const res = await fetch("http://localhost:3000/predict", {
+      const res = await fetch("https://catclic.onrender.com/predict", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ teamA, teamB, oddsA, oddsB }),
