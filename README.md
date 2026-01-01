@@ -5,7 +5,7 @@
 **Catclic** to inteligentny asystent, który automatyzuje proces wyszukiwania zakładów, analizuje mecze przy użyciu **Google Gemini AI** i pomaga unikać pętli oraz błędów poznawczych. Zbudowany z myślą o bezpieczeństwie i efektywności.
 
 > [!TIP]
-> **Strona projektu:** [catclic-web.vercel.app](https://catclic-web.vercel.app/)
+> **Strona projektu:** [catclic.tech](https://catclic.tech)
 
 ---
 
