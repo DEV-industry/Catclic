@@ -1,4 +1,4 @@
-# Catclic - Your Intelligent Betclic Assistant
+# Catclic - Intelligent Betclic Assistant
 
 ![Catclic Banner](extension/assets/logo.jpg)
 
