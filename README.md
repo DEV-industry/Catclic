@@ -1,4 +1,4 @@
-# <img src="extension/assets/logo.png" width="40" height="40" align="top" /> Catclic - Your Intelligent Betclic Assistant
+# Catclic - Your Intelligent Betclic Assistant
 
 ![Catclic Banner](extension/assets/logo.jpg)
 
@@ -9,14 +9,14 @@
 
 ---
 
-## 🚀 Główne Funkcje (Key Features)
+## Główne Funkcje (Key Features)
 
 | Funkcja | Opis |
 | :--- | :--- |
-| **🤖 Smart Auto-Picker** | Inteligentny algorytm nawiguje po ligach, wyszukuje zakłady i automatycznie skleja kupony. |
-| **🧠 Gemini AI Core** | Silnik oparty na Google Gemini analizuje statystyki, H2H i formę, sugerując najlepsze typy. |
-| **🛡️ Bezpieczna Nawigacja** | Symulacja zachowań ludzkich (losowe czasy, "chłodzenie") dla ochrony konta. |
-| **⚡ Błyskawiczne Kupony** | Jedno kliknięcie, aby znaleźć okazje i dodać je do betslipu. |
+| **Smart Auto-Picker** | Inteligentny algorytm nawiguje po ligach, wyszukuje zakłady i automatycznie skleja kupony. |
+| **Gemini AI Core** | Silnik oparty na Google Gemini analizuje statystyki, H2H i formę, sugerując najlepsze typy. |
+| **Bezpieczna Nawigacja** | Symulacja zachowań ludzkich (losowe czasy, "chłodzenie") dla ochrony konta. |
+| **Błyskawiczne Kupony** | Jedno kliknięcie, aby znaleźć okazje i dodać je do betslipu. |
 
 ---
 
@@ -44,7 +44,7 @@
 
 ---
 
-## 🎮 Jak to działa? (How it works)
+## Jak to działa? (How it works)
 
 ### 1. Automatyzacja
 Algorytm przeszukuje dostępne mecze, filtrując je według zadanych kryteriów. Omija mecze, które mogą powodować pętle.
@@ -57,7 +57,7 @@ Wybrane zakłady trafiają na Twój kupon - szybko i skutecznie.
 
 ---
 
-## 🏗️ Technologia (Stack)
+## Technologia (Stack)
 
 - **Frontend / Extension**:<br/>
   ![Svelte](https://img.shields.io/badge/svelte-%23f1413d.svg?style=for-the-badge&logo=svelte&logoColor=white)
