@@ -25,7 +25,7 @@
 1. **Pobierz Repozytorium**
    Sklonuj ten projekt lub pobierz jako ZIP.
    ```bash
-   git clone https://github.com/YourUsername/Betclic.git
+   git clone https://github.com/DEV-industry/Catclic.git
    ```
 
 2. **Przygotuj Rozszerzenie**

@@ -25,12 +25,13 @@
   let isGenerated = false;
   const logoUrl = chrome.runtime.getURL("assets/icon-badge.png");
   const mainLogoUrl = chrome.runtime.getURL("assets/logo.png");
+  const API_URL = process.env.PLASMO_PUBLIC_API_URL || "http://localhost:3000";
 
   async function getPrediction() {
     if (isLoading || isGenerated) return;
     isLoading = true;
     try {
-      const res = await fetch("https://catclic.onrender.com/predict", {
+      const res = await fetch(`${API_URL}/predict`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ teamA, teamB, oddsA, oddsB }),

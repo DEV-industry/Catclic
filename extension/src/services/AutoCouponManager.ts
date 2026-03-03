@@ -385,7 +385,8 @@ export async function processAutoCoupon() {
 
         try {
             // Rank for Standard First
-            const response = await fetch('https://catclic.onrender.com/predict/rank', {
+            const API_URL = process.env.PLASMO_PUBLIC_API_URL || "http://localhost:3000";
+            const response = await fetch(`${API_URL}/predict/rank`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ matches: candidates, count: needed })

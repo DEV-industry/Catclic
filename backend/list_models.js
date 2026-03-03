@@ -21,7 +21,7 @@ async function main() {
             return;
         }
 
-        console.log("Using API Key:", apiKey.substring(0, 10) + "...");
+        console.log("API Key loaded: ✓");
 
         const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`;
 
